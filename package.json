@@ -1,0 +1,23 @@
+{
+  "name": "fonzo-nettsted",
+  "version": "0.0.1",
+  "description": "Website",
+  "keywords": [
+    "Website"
+  ],
+  "homepage": "https://github.com/tempNameForOrg/Fonzo-Nettsted#readme",
+  "bugs": {
+    "url": "https://github.com/tempNameForOrg/Fonzo-Nettsted/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tempNameForOrg/Fonzo-Nettsted.git"
+  },
+  "license": "ISC",
+  "author": "tempNameForOrg",
+  "type": "commonjs",
+  "main": "src/js/index.js",
+  "scripts": {
+    "test": "npm test"
+  }
+}
