@@ -16,7 +16,7 @@
   "license": "ISC",
   "author": "tempNameForOrg",
   "type": "commonjs",
-  "main": "src/js/index.js",
+  "main": "server/index.js",
   "scripts": {
     "test": "npm test"
   }
