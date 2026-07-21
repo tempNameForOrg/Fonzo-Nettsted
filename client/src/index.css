@@ -1,0 +1,11 @@
+@import "tailwindcss";
+
+@theme {
+  --color-chili: #c7391c;
+  --color-marigold: #f1c153;
+  --color-forest: #326039;
+  --color-gold: #ad7414;
+  --color-terracotta: #c87c3e;
+  --color-olive: #a4ad64;
+  --color-cream: #d8ddb8;
+}
