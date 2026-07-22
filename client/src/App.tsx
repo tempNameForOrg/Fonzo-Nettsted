@@ -2,6 +2,7 @@ import { useState } from "react"
 import Navbar from "./components/Navbar"
 import Footer from "./components/Footer"
 import Googleapi from "./components/Googleapi"
+import Aapningstider from "./components/Aapningstider"
 
 function App() {
   const [count, setCount] = useState(0)
@@ -15,6 +16,7 @@ function App() {
         
       </section>
       <section id="Info">
+        <Aapningstider></Aapningstider>
         <Googleapi></Googleapi>
       </section>
       <section id="Footer">
