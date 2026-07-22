@@ -1,6 +1,7 @@
 import { useState } from "react"
 import Navbar from "./components/Navbar"
 import Footer from "./components/Footer"
+import Googleapi from "./components/Googleapi"
 
 function App() {
   const [count, setCount] = useState(0)
@@ -14,7 +15,7 @@ function App() {
         
       </section>
       <section id="Info">
-        
+        <Googleapi></Googleapi>
       </section>
       <section id="Footer">
         <Footer></Footer>
