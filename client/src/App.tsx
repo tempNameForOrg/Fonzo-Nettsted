@@ -3,6 +3,7 @@ import Navbar from "./components/Navbar"
 import Footer from "./components/Footer"
 import Googleapi from "./components/Googleapi"
 import Aapningstider from "./components/Aapningstider"
+import TacoHero from "./components/Tacohero"
 
 function App() {
   const [count, setCount] = useState(0)
@@ -13,6 +14,11 @@ function App() {
         <Navbar></Navbar>
       </section>
       <section id="Hero">
+      <div className="color-olive py-5 my-5 bg-cream">
+        <div className="flex flex-col items-center">
+         <TacoHero></TacoHero>
+        </div>
+        </div>
         
       </section>
       <section id="Info">
