@@ -14,6 +14,7 @@ const Googleapi = () => {
                     allowFullScreen={true}
                     loading="lazy"
                     referrerPolicy="strict-origin-when-cross-origin"
+                    title="Addressen er Bjornstjerne Bjornsons gate 80, 3044 Drammen"
                 ></iframe>
           </div>
         </div>
