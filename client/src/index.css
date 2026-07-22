@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Elms+Sans:ital,wght@0,100..900;1,100..900&family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap');
 @import "tailwindcss";
 
 @theme {
@@ -8,4 +9,9 @@
   --color-terracotta: #c87c3e;
   --color-olive: #a4ad64;
   --color-cream: #d8ddb8;
+  --font-sans: "Elms Sans", system-ui, sans-serif;
+  --font-family: "Elms Sans", sans-serif;
+  --font-optical-sizing: auto;
+  --font-weight: 100;
+  --font-style: normal;
 }
