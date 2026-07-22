@@ -30,7 +30,7 @@ const Footer = () => {
               Feil med Siden?
               <a
                 href="mailto:adrian.balunan237426@gmail.com"
-                className="text-cream hover:text-marigold underline underline-offset-2 transition-colors"
+                className="text-chili hover:text-marigold underline underline-offset-2 transition-colors"
               >
                 Gjerne send en mail!
               </a>
