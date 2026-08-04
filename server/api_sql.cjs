@@ -127,6 +127,19 @@ app.put('/api/orders/:id', (req, res) => {
   res.json(full)
 })
 
+app.delete('/api/orders/:id', (req, res) => {
+  const id = req.params.id
+  try {
+    db.prepare('DELETE FROM order_items WHERE order_id = ?').run(id)
+    const info = db.prepare('DELETE FROM orders WHERE id = ?').run(id)
+    broadcast({ type: 'order-deleted', id })
+    return res.json({ success: !!info.changes })
+  } catch (e) {
+    console.error('Failed to delete order', e)
+    return res.status(500).json({ error: 'failed to delete' })
+  }
+})
+
 app.post('/api/menu', (req, res) => {
   const { name, description = null, price = 0, category = null, available = true, position = 0 } = req.body
   const id = String(Date.now())

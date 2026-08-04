@@ -14,24 +14,31 @@ export default function OrdersAdmin() {
       setLoading(true)
       const res = await fetch('/api/orders')
       const data = await res.json()
+      // sort ascending (oldest first) so left-to-right oldest -> newest
+      data.sort((a: any, b: any) => (a.createdAt || 0) - (b.createdAt || 0))
       setOrders(data)
     } catch (e) {
       console.error('Failed to fetch orders', e)
     } finally { setLoading(false) }
   }
 
-  const setStatus = async (id: string, status: string) => {
-    await fetch(`/api/orders/${id}`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ status }) })
-    fetchOrders()
+  const deleteOrder = async (id: string) => {
+    try {
+      await fetch(`/api/orders/${id}`, { method: 'DELETE' })
+      fetchOrders()
+    } catch (e) {
+      console.error('Failed to delete order', e)
+      alert('Kunne ikke fjerne bestillingen')
+    }
   }
 
   return (
     <section>
       <h2 className="text-2xl font-semibold mb-4">Bestillinger</h2>
       {loading && <div>Loading...</div>}
-      <div className="space-y-4">
+      <div className="flex gap-4 overflow-x-auto py-2">
         {orders.map(o => (
-          <div key={o.id} className="p-3 border rounded">
+          <div key={o.id} className="p-3 border rounded min-w-[300px] cursor-pointer" onClick={() => deleteOrder(o.id)} title="Klikk for å fjerne bestillingen">
             <div className="flex justify-between items-center mb-2">
               <div>
                 <div className="font-medium">Order {o.id}</div>
@@ -51,9 +58,7 @@ export default function OrdersAdmin() {
               ))}
             </ul>
             <div className="flex gap-2">
-              <button className="px-2 py-1" onClick={() => setStatus(o.id, 'preparing')}>Forbered</button>
-              <button className="px-2 py-1" onClick={() => setStatus(o.id, 'ready')}>Klar</button>
-              <button className="px-2 py-1" onClick={() => setStatus(o.id, 'picked')}>Hentet</button>
+              <button className="px-3 py-1 bg-chili text-white" onClick={() => deleteOrder(o.id)}>Ferdig</button>
             </div>
           </div>
         ))}
