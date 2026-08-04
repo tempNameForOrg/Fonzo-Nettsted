@@ -13,8 +13,22 @@ type MenuItem = {
 const MenuAdmin: React.FC = () => {
   const [items, setItems] = useState<MenuItem[]>([])
   const [editing, setEditing] = useState<Partial<MenuItem> | null>(null)
+  const [categories, setCategories] = useState<Array<{ id: string, name: string }>>([])
+  const [newCategory, setNewCategory] = useState('')
 
   useEffect(() => { fetchItems() }, [])
+
+  useEffect(() => { fetchCategories() }, [])
+
+  const fetchCategories = async () => {
+    try {
+      const res = await fetch('/api/categories')
+      const data = await res.json()
+      setCategories(data)
+    } catch (e) {
+      console.error('Failed to fetch categories', e)
+    }
+  }
 
   const fetchItems = async () => {
     const res = await fetch('/api/menu')
@@ -24,6 +38,7 @@ const MenuAdmin: React.FC = () => {
 
   const save = async (item: Partial<MenuItem>) => {
     if (!item.image) { alert('Image is required'); return }
+    if (!item.category) { alert('Category is required'); return }
     if (item.id) {
       await fetch(`/api/menu/${item.id}`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(item) })
     } else {
@@ -31,6 +46,24 @@ const MenuAdmin: React.FC = () => {
     }
     setEditing(null)
     fetchItems()
+  }
+
+  const addCategory = async () => {
+    if (!newCategory || !newCategory.trim()) return
+    try {
+      await fetch('/api/categories', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: newCategory.trim() }) })
+      setNewCategory('')
+      fetchCategories()
+    } catch (e) { console.error('failed add category', e) }
+  }
+
+  const removeCategory = async (id: string) => {
+    if (!confirm('Remove category? This will unset the category on items.')) return
+    try {
+      await fetch(`/api/categories/${id}`, { method: 'DELETE' })
+      fetchCategories()
+      fetchItems()
+    } catch (e) { console.error('failed delete category', e) }
   }
 
   const remove = async (id: string) => {
@@ -42,15 +75,38 @@ const MenuAdmin: React.FC = () => {
   return (
     <section>
       <h2 className="text-2xl font-semibold mb-2">Menu Admin</h2>
-      <div className="mb-4">
-        <button className="px-3 py-1 bg-forest text-white" onClick={() => setEditing({ name: '', price: 0, available: true })}>Add item</button>
+      <div className="mb-4 flex items-start gap-6">
+        <div>
+          <button className="px-3 py-1 bg-forest text-white" onClick={() => setEditing({ name: '', price: 0, available: true })}>Add item</button>
+        </div>
+        <div className="p-2 border rounded max-w-md w-full">
+          <div className="font-medium mb-2">Categories</div>
+          <div className="flex gap-2 mb-2">
+            <input className="flex-1 p-1 border" value={newCategory} onChange={(e) => setNewCategory(e.target.value)} placeholder="New category name" />
+            <button className="px-2 py-1 bg-forest text-white" onClick={addCategory}>Add</button>
+          </div>
+          <ul className="text-sm">
+            {categories.map(c => (
+              <li key={c.id} className="flex justify-between items-center py-1">
+                <div>{c.name}</div>
+                <div>
+                  <button className="px-2 py-1 text-sm" onClick={() => removeCategory(c.id)}>Delete</button>
+                </div>
+              </li>
+            ))}
+            {categories.length === 0 && <li className="text-gray-500">No categories yet</li>}
+          </ul>
+        </div>
       </div>
       {editing && (
         <div className="p-2 border mb-4 max-w-md">
           <label className="block">Name</label>
           <input className="w-full p-1 border" value={editing.name || ''} onChange={(e) => setEditing({ ...editing, name: e.target.value })} />
           <label className="block mt-2">Category</label>
-          <input className="w-full p-1 border" value={editing.category || ''} onChange={(e) => setEditing({ ...editing, category: e.target.value })} />
+          <select className="w-full p-1 border" value={editing.category || ''} onChange={(e) => setEditing({ ...editing, category: e.target.value })}>
+            <option value="">-- choose category --</option>
+            {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+          </select>
           <label className="block mt-2">Price</label>
           <input className="w-full p-1 border" value={String(editing.price ?? 0)} onChange={(e) => setEditing({ ...editing, price: Number(e.target.value) })} />
           <label className="block mt-2">Description</label>

@@ -39,6 +39,12 @@ CREATE TABLE IF NOT EXISTS order_items (
   qty INTEGER NOT NULL DEFAULT 1,
   FOREIGN KEY(order_id) REFERENCES orders(id) ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS categories (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  createdAt INTEGER NOT NULL
+);
 `
 
 if (!fs.existsSync(DB_FILE)) {
@@ -185,6 +191,44 @@ app.delete('/api/menu/:id', (req, res) => {
   db.prepare('DELETE FROM menu_items WHERE id = ?').run(id)
   broadcast({ type: 'menu-deleted', id })
   res.json({ success: true })
+})
+
+// Categories endpoints
+app.get('/api/categories', (req, res) => {
+  const rows = db.prepare('SELECT id,name,createdAt FROM categories ORDER BY name ASC').all()
+  res.json(rows)
+})
+
+app.post('/api/categories', (req, res) => {
+  const { name } = req.body
+  if (!name || !String(name).trim()) return res.status(400).json({ error: 'name required' })
+  const id = String(Date.now())
+  const createdAt = now()
+  try {
+    db.prepare('INSERT INTO categories (id,name,createdAt) VALUES (?,?,?)').run(id, String(name).trim(), createdAt)
+    const cat = { id, name: String(name).trim(), createdAt }
+    broadcast({ type: 'category-created', category: cat })
+    res.json(cat)
+  } catch (e) {
+    console.error('failed to create category', e)
+    res.status(500).json({ error: 'failed' })
+  }
+})
+
+app.delete('/api/categories/:id', (req, res) => {
+  const id = req.params.id
+  const cat = db.prepare('SELECT * FROM categories WHERE id = ?').get(id)
+  if (!cat) return res.status(404).json({ error: 'not found' })
+  try {
+    // unset category on menu items that referenced this category name
+    db.prepare('UPDATE menu_items SET category = NULL WHERE category = ?').run(cat.name)
+    db.prepare('DELETE FROM categories WHERE id = ?').run(id)
+    broadcast({ type: 'category-deleted', id })
+    res.json({ success: true })
+  } catch (e) {
+    console.error('failed to delete category', e)
+    res.status(500).json({ error: 'failed' })
+  }
 })
 
 const port = process.env.PORT || 4001
