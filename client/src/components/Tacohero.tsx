@@ -1,4 +1,9 @@
-import { GizmoHelper, GizmoViewport, OrbitControls, useGLTF } from "@react-three/drei";
+import {
+  GizmoHelper,
+  GizmoViewport,
+  OrbitControls,
+  useGLTF,
+} from "@react-three/drei";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
 
@@ -15,7 +20,7 @@ function TacoShell() {
   // Half-pipe cylinder bent into a folded taco shell shape
   return (
     <mesh rotation={[0, 0, -Math.PI / 2]} castShadow receiveShadow>
-      <cylinderGeometry args={[0.48, 0.4,2.4, 32, 1, true, 0, Math.PI * 2]} />
+      <cylinderGeometry args={[0.48, 0.4, 2.4, 32, 1, true, 0, Math.PI * 2]} />
       <meshStandardMaterial
         color="#e0a952"
         roughness={0.85}
@@ -28,8 +33,13 @@ function TacoShell() {
 function TacoEnd() {
   // Half-pipe cylinder bent into a folded taco shell shape
   return (
-    <mesh rotation={[0, 0, -Math.PI / 2]} position={[-1.1,0,0]} castShadow receiveShadow>
-      <cylinderGeometry args={[0.4, 0.4,0.1, 32, 1, false, 0, Math.PI * 2]} />
+    <mesh
+      rotation={[0, 0, -Math.PI / 2]}
+      position={[-1.1, 0, 0]}
+      castShadow
+      receiveShadow
+    >
+      <cylinderGeometry args={[0.4, 0.4, 0.1, 32, 1, false, 0, Math.PI * 2]} />
       <meshStandardMaterial
         color="#e0a952"
         roughness={0.85}
@@ -44,11 +54,11 @@ function GroundBeef() {
   const rand = useMemo(() => seededRandom(42), []);
   const chunks = useMemo(() => {
     const arr = [];
-    for (let i = 0; i < 24; i++) {
-      const x = (rand() - 0.5) * 2.1 + rand()*0.5;
+    for (let i = 0; i < 26; i++) {
+      const x = (rand() - 0.5) * 2.1 + rand() * 0.5;
       const y = rand() * 0.35 - 0.2;
       const z = (rand() - 0.5) * 0.8;
-      const scale = 0.12 + rand() * 0.1-0.3;
+      const scale = 0.12 + rand() * 0.1 - 0.3;
       arr.push({
         position: [x, y, z],
         scale,
@@ -77,8 +87,8 @@ function Lettuce() {
   const rand = useMemo(() => seededRandom(7), []);
   const strands = useMemo(() => {
     const arr = [];
-    for (let i = 0; i < 11; i++) {
-      const x = (rand() - 0.5) * 2.3 + rand();
+    for (let i = 0; i < 15; i++) {
+      const x = (rand() - 0.5) * 1.3 + rand();
       const y = rand() * 0.5 - 0.3;
       const z = 0;
       arr.push({
@@ -109,7 +119,7 @@ function Tomato() {
   const rand = useMemo(() => seededRandom(19), []);
   const cubes = useMemo(() => {
     const arr = [];
-    for (let i = 0; i < 14; i++) {
+    for (let i = 0; i < 19; i++) {
       const x = (rand() - 0.5) * 2;
       const spread = 1 - Math.abs(x) / 1.3;
       const y = -0.1 + rand() * 0.4;
@@ -193,40 +203,50 @@ function SourCreamDrizzle() {
 function Taco() {
   const tacoRef = useRef(null);
 
-  // useFrame(() => {
-  //   tacoRef.current.rotation.y += 0.006;
-  //   tacoRef.current.rotation.z += 0.006;
-  //   tacoRef.current.rotation.x += 0.006;
-  // });
+  useFrame(() => {
+    tacoRef.current.rotation.y += 0.006;
+    tacoRef.current.rotation.z += 0.006;
+    tacoRef.current.rotation.x += 0.006;
+  });
 
   return (
-    <group ref={tacoRef}>
-      <TacoEnd />
-      <TacoShell />
-      <GroundBeef />
-      <Lettuce />
-      <Tomato />
-      <Cheese />
-      <SourCreamDrizzle />
-    </group>
+    <>
+      <group ref={tacoRef}>
+        <TacoEnd />
+        <TacoShell />
+        <GroundBeef />
+        <Lettuce />
+        <Tomato />
+        <Cheese />
+        <SourCreamDrizzle />
+      </group>
+    </>
   );
 }
 
 export default function TacoHero() {
   return (
     <>
-      <div className="mx-auto min-h-screen max-w-7xl px-4 sm:px-6 lg:px-8 flex flex-col items-center justify-center">
-        <div className="aspect-video min-h-screen bg-cream">
-          <Canvas camera={{ position: [2.5, 0, 0], fov: 90 }}>
-            <axesHelper args={[20]} />
+      <div className="mx-auto min-h-screen max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="aspect-video relative z-0 min-h-screen">
+          <Canvas
+            className="!inset-0 !absolute !h-full !w-full"
+            camera={{ position: [1.5, 0, 0], fov: 90 }}
+          >
+            {/* <axesHelper args={[20]} />
             <gridHelper args={[20, 20, "red", "blue"]} />
             <GizmoHelper alignment="bottom-right" margin={[50, 50]}>
               <GizmoViewport />
             </GizmoHelper>
-            <OrbitControls />
+            <OrbitControls /> */}
             <ambientLight intensity={2} position={[2, 2, 2]} />
             <Taco />
           </Canvas>
+          <div className="absolute z-50 flex min-h-screen items-center justify-center pointer-events-none">
+            <h1 className="text-center text-center text-9xl font-bold text-forest">
+              Fonzo Taco
+            </h1>
+          </div>
         </div>
       </div>
     </>
