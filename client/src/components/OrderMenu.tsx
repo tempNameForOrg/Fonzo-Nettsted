@@ -40,25 +40,33 @@ export default function OrderMenu() {
     setCart(c => c.map(x => x.id === id ? { ...x, qty: Math.max(0, qty) } : x).filter(x => x.qty > 0))
   }
 
-  const placeOrder = () => {
+  const placeOrder = async () => {
     if (cart.length === 0) { alert('Cart is empty'); return }
-    const order = {
-      id: String(Date.now()),
+    const payload = {
       items: cart.map(({ id, name, price, qty }) => ({ id, name, price, qty })),
       total: cart.reduce((s, it) => s + it.price * it.qty, 0),
-      createdAt: Date.now(),
       status: 'placed'
     }
     try {
-      const raw = localStorage.getItem('orders')
-      const arr = raw ? JSON.parse(raw) : []
-      arr.push(order)
-      localStorage.setItem('orders', JSON.stringify(arr))
+      const res = await fetch('/api/orders', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) })
+      if (!res.ok) throw new Error('server error')
+      const saved = await res.json()
       setCart([])
-      alert('Order placed — ID: ' + order.id)
+      alert('Order placed — ID: ' + saved.id)
     } catch (e) {
-      console.error('Failed to save order', e)
-      alert('Failed to place order')
+      console.error('Failed to save order to API, falling back to localStorage', e)
+      try {
+        const order = { id: String(Date.now()), items: payload.items, total: payload.total, createdAt: Date.now(), status: 'placed' }
+        const raw = localStorage.getItem('orders')
+        const arr = raw ? JSON.parse(raw) : []
+        arr.push(order)
+        localStorage.setItem('orders', JSON.stringify(arr))
+        setCart([])
+        alert('Order placed locally — ID: ' + order.id)
+      } catch (e2) {
+        console.error('Failed to save locally', e2)
+        alert('Failed to place order')
+      }
     }
   }
 

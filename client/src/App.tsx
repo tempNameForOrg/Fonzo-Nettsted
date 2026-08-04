@@ -5,13 +5,14 @@ import Googleapi from "./components/Googleapi"
 import Aapningstider from "./components/Aapningstider"
 import TacoHero from "./components/Tacohero"
 import MenuAdmin from "./components/MenuAdmin"
+import OrdersAdmin from "./components/OrdersAdmin"
 import OrderMenu from "./components/OrderMenu"
 
 type View = "home" | "menu" | "order" | "admin"
 
 function App() {
   const [view, setView] = useState<View>("home")
-  const [adminMode, setAdminMode] = useState<'landing' | 'edit'>('landing')
+  const [adminMode, setAdminMode] = useState<'landing' | 'edit' | 'orders'>('landing')
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -50,7 +51,10 @@ function App() {
             {adminMode === 'landing' && (
               <div className="max-w-3xl mx-auto flex items-center justify-between">
                 <div className="text-lg font-semibold">Admin</div>
-                <button className="px-4 py-2 bg-forest text-white" onClick={() => setAdminMode('edit')}>Edit menu</button>
+                <div className="flex gap-2">
+                  <button className="px-4 py-2 bg-forest text-white" onClick={() => setAdminMode('edit')}>Edit menu</button>
+                  <button className="px-4 py-2 bg-chili text-white" onClick={() => setAdminMode('orders')}>Se bestillinger</button>
+                </div>
               </div>
             )}
 
@@ -64,6 +68,19 @@ function App() {
                   </div>
                 </div>
                 <MenuAdmin />
+              </div>
+            )}
+
+            {adminMode === 'orders' && (
+              <div className="max-w-3xl mx-auto">
+                <div className="flex justify-between items-center mb-4">
+                  <div className="text-lg font-semibold">Bestillinger</div>
+                  <div>
+                    <button className="px-3 py-1 mr-2" onClick={() => setAdminMode('landing')}>Back</button>
+                    <button className="px-3 py-1" onClick={() => setView('home')}>Exit Admin</button>
+                  </div>
+                </div>
+                <OrdersAdmin />
               </div>
             )}
           </section>
