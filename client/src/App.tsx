@@ -14,12 +14,12 @@ function App() {
   const [adminMode, setAdminMode] = useState<'landing' | 'edit'>('landing')
 
   return (
-    <>
+    <div className="min-h-screen flex flex-col">
       <section id="Navbar">
         <Navbar view={view} setView={setView} />
       </section>
 
-      <main>
+      <main className="flex-grow">
         {view === "home" && (
           <section id="Hero">
             <div className="color-olive py-5 my-5 bg-cream">
@@ -76,10 +76,11 @@ function App() {
           <Googleapi />
         </section>
       )}
+
       <section id="Footer">
         <Footer />
       </section>
-    </>
+    </div>
   )
 }
 
