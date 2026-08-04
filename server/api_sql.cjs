@@ -156,6 +156,7 @@ app.delete('/api/orders/:id', (req, res) => {
 
 app.post('/api/menu', (req, res) => {
   const { name, description = null, price = 0, category = null, available = true, position = 0, image = null } = req.body
+  if (!image) return res.status(400).json({ error: 'image required' })
   const id = String(Date.now())
   const createdAt = now()
   const updatedAt = createdAt

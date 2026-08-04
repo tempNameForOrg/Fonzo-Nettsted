@@ -23,6 +23,7 @@ const MenuAdmin: React.FC = () => {
   }
 
   const save = async (item: Partial<MenuItem>) => {
+    if (!item.image) { alert('Image is required'); return }
     if (item.id) {
       await fetch(`/api/menu/${item.id}`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(item) })
     } else {
