@@ -7,6 +7,7 @@ type MenuItem = {
   price: number
   available: boolean
   category?: string
+  image?: string
 }
 
 const MenuAdmin: React.FC = () => {
@@ -47,10 +48,21 @@ const MenuAdmin: React.FC = () => {
         <div className="p-2 border mb-4 max-w-md">
           <label className="block">Name</label>
           <input className="w-full p-1 border" value={editing.name || ''} onChange={(e) => setEditing({ ...editing, name: e.target.value })} />
+          <label className="block mt-2">Category</label>
+          <input className="w-full p-1 border" value={editing.category || ''} onChange={(e) => setEditing({ ...editing, category: e.target.value })} />
           <label className="block mt-2">Price</label>
           <input className="w-full p-1 border" value={String(editing.price ?? 0)} onChange={(e) => setEditing({ ...editing, price: Number(e.target.value) })} />
           <label className="block mt-2">Description</label>
           <textarea className="w-full p-1 border" value={editing.description || ''} onChange={(e) => setEditing({ ...editing, description: e.target.value })} />
+          <label className="block mt-2">Image URL (or upload)</label>
+          <input className="w-full p-1 border" value={editing.image || ''} onChange={(e) => setEditing({ ...editing, image: e.target.value })} />
+          <input className="mt-2" type="file" accept="image/*" onChange={async (e) => {
+            const f = e.target.files && e.target.files[0]
+            if (!f) return
+            const reader = new FileReader()
+            reader.onload = () => setEditing({ ...editing, image: String(reader.result) })
+            reader.readAsDataURL(f)
+          }} />
           <div className="mt-2">
             <button className="px-3 py-1 bg-forest text-white" onClick={() => save(editing)}>Save</button>
             <button className="px-3 py-1 ml-2" onClick={() => setEditing(null)}>Cancel</button>
@@ -61,9 +73,13 @@ const MenuAdmin: React.FC = () => {
       <ul className="space-y-2">
         {items.map((it) => (
           <li key={it.id} className="p-2 border rounded flex justify-between items-center">
-            <div>
-              <div className="font-medium">{it.name} — {it.price} kr</div>
-              <div className="text-sm">{it.description}</div>
+            <div className="flex items-center">
+              {it.image && <img src={it.image} alt={it.name} className="w-16 h-16 object-cover mr-3" />}
+              <div>
+                <div className="font-medium">{it.name} — {it.price} kr</div>
+                <div className="text-sm">{it.description}</div>
+                <div className="text-xs text-gray-500">{it.category}</div>
+              </div>
             </div>
             <div className="flex gap-2">
               <button className="px-2 py-1" onClick={() => setEditing(it)}>Edit</button>

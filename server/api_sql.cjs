@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS menu_items (
   category TEXT,
   available INTEGER NOT NULL DEFAULT 1,
   position INTEGER NOT NULL DEFAULT 0,
+  image TEXT,
   createdAt INTEGER NOT NULL,
   updatedAt INTEGER NOT NULL
 );
@@ -45,6 +46,14 @@ if (!fs.existsSync(DB_FILE)) {
 
 const db = new Database(DB_FILE)
 db.exec(initSql)
+
+// ensure image column exists (in case DB created before this change)
+try {
+  const cols = db.prepare("PRAGMA table_info(menu_items)").all().map(c => c.name)
+  if (!cols.includes('image')) {
+    db.prepare('ALTER TABLE menu_items ADD COLUMN image TEXT').run()
+  }
+} catch (e) { console.warn('could not ensure image column', e) }
 
 // helper
 function now() { return Date.now() }
@@ -141,13 +150,13 @@ app.delete('/api/orders/:id', (req, res) => {
 })
 
 app.post('/api/menu', (req, res) => {
-  const { name, description = null, price = 0, category = null, available = true, position = 0 } = req.body
+  const { name, description = null, price = 0, category = null, available = true, position = 0, image = null } = req.body
   const id = String(Date.now())
   const createdAt = now()
   const updatedAt = createdAt
-  db.prepare('INSERT INTO menu_items (id,name,description,price,category,available,position,createdAt,updatedAt) VALUES (?,?,?,?,?,?,?,?,?)')
-    .run(id, name, description, Number(price), category, available ? 1 : 0, Number(position), createdAt, updatedAt)
-  const item = { id, name, description, price: Number(price), category, available, position, createdAt, updatedAt }
+  db.prepare('INSERT INTO menu_items (id,name,description,price,category,available,position,image,createdAt,updatedAt) VALUES (?,?,?,?,?,?,?,?,?,?)')
+    .run(id, name, description, Number(price), category, available ? 1 : 0, Number(position), image, createdAt, updatedAt)
+  const item = { id, name, description, price: Number(price), category, available, position, image, createdAt, updatedAt }
   broadcast({ type: 'menu-created', item })
   res.json(item)
 })
@@ -157,7 +166,9 @@ app.put('/api/menu/:id', (req, res) => {
   const { name, description, price, category, available, position } = req.body
   const updatedAt = now()
   const stmt = db.prepare('UPDATE menu_items SET name = coalesce(?, name), description = coalesce(?, description), price = coalesce(?, price), category = coalesce(?, category), available = coalesce(?, available), position = coalesce(?, position), updatedAt = ? WHERE id = ?')
-  stmt.run(name, description, price !== undefined ? Number(price) : undefined, category, available !== undefined ? (available ? 1 : 0) : undefined, position !== undefined ? Number(position) : undefined, updatedAt, id)
+  const { image } = req.body
+  const stmt = db.prepare('UPDATE menu_items SET name = coalesce(?, name), description = coalesce(?, description), price = coalesce(?, price), category = coalesce(?, category), available = coalesce(?, available), position = coalesce(?, position), image = coalesce(?, image), updatedAt = ? WHERE id = ?')
+  stmt.run(name, description, price !== undefined ? Number(price) : undefined, category, available !== undefined ? (available ? 1 : 0) : undefined, position !== undefined ? Number(position) : undefined, image !== undefined ? image : undefined, updatedAt, id)
   const item = db.prepare('SELECT * FROM menu_items WHERE id = ?').get(id)
   if (!item) return res.status(404).json({ error: 'not found' })
   item.available = !!item.available
