@@ -1,4 +1,4 @@
-import { GizmoHelper, GizmoViewport, OrbitControls } from "@react-three/drei";
+import { GizmoHelper, GizmoViewport, OrbitControls, useGLTF } from "@react-three/drei";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
 
@@ -15,7 +15,7 @@ function TacoShell() {
   // Half-pipe cylinder bent into a folded taco shell shape
   return (
     <mesh rotation={[0, 0, -Math.PI / 2]} castShadow receiveShadow>
-      <cylinderGeometry args={[0.5, 0.5,2.4, 32, 1, true, 0, Math.PI * 2]} />
+      <cylinderGeometry args={[0.48, 0.4,2.4, 32, 1, true, 0, Math.PI * 2]} />
       <meshStandardMaterial
         color="#e0a952"
         roughness={0.85}
@@ -29,7 +29,7 @@ function TacoEnd() {
   // Half-pipe cylinder bent into a folded taco shell shape
   return (
     <mesh rotation={[0, 0, -Math.PI / 2]} position={[-1.1,0,0]} castShadow receiveShadow>
-      <cylinderGeometry args={[0.5, 0.5,0.1, 32, 1, false, 0, Math.PI * 2]} />
+      <cylinderGeometry args={[0.4, 0.4,0.1, 32, 1, false, 0, Math.PI * 2]} />
       <meshStandardMaterial
         color="#e0a952"
         roughness={0.85}
@@ -47,7 +47,7 @@ function GroundBeef() {
     for (let i = 0; i < 24; i++) {
       const x = (rand() - 0.5) * 2.1 + rand()*0.5;
       const y = rand() * 0.35 - 0.2;
-      const z = (rand() - 0.5) * 1.1;
+      const z = (rand() - 0.5) * 0.8;
       const scale = 0.12 + rand() * 0.1-0.3;
       arr.push({
         position: [x, y, z],
@@ -143,7 +143,7 @@ function Cheese() {
       const x = (rand() - 0.5) * 2.3;
       const spread = 1 - Math.abs(x) / 1.3;
       const y = 0.1 + rand() * 0.2;
-      const z = (rand() - 0.5) * 1.1 * spread;
+      const z = (rand() - 0.5) * 0.9 * spread;
       arr.push({
         position: [x, y, z],
         rotation: [rand() * Math.PI, rand() * Math.PI, rand() * Math.PI],
