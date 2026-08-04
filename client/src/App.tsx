@@ -14,12 +14,7 @@ function App() {
         <Navbar></Navbar>
       </section>
       <section id="Hero">
-      <div className="color-olive py-5 my-5 bg-cream">
-        <div className="flex flex-col items-center">
-         <TacoHero></TacoHero>
-        </div>
-        </div>
-        
+        <TacoHero></TacoHero>
       </section>
       <section id="Info">
         <Aapningstider></Aapningstider>
