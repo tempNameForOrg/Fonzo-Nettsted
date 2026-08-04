@@ -16,6 +16,7 @@ export default function OrderMenu() {
   const [menu, setMenu] = useState<MenuItem[]>([])
   const [cart, setCart] = useState<CartItem[]>([])
   const [loading, setLoading] = useState(false)
+  const [activeTab, setActiveTab] = useState<string>('All')
 
   useEffect(() => { fetchMenu() }, [])
 
@@ -77,38 +78,36 @@ export default function OrderMenu() {
       <div className="md:col-span-2">
         <h2 className="text-2xl font-semibold mb-4">Meny</h2>
         {loading && <div>Loading...</div>}
-        {/* group items by category */}
+        {/* category tabs */}
         {(() => {
-          const groups: { [k: string]: typeof menu } = {}
-          for (const it of menu) {
-            const key = it.category || 'Uten kategori'
-            groups[key] = groups[key] || []
-            groups[key].push(it)
-          }
-          const keys = Object.keys(groups).sort()
+          const rawCats = Array.from(new Set(menu.map(m => (m.category || 'Uten kategori'))))
+          rawCats.sort()
+          const tabs = ['All', ...rawCats]
+          const filtered = activeTab === 'All' ? menu : menu.filter(m => (m.category || 'Uten kategori') === activeTab)
           return (
-            <div className="space-y-6">
-              {keys.map(k => (
-                <div key={k}>
-                  <h3 className="font-semibold mb-2">{k}</h3>
-                  <ul className="space-y-3">
-                    {groups[k].map(it => (
-                      <li key={it.id} className="p-3 border rounded flex justify-between items-center">
-                        <div className="flex items-center gap-3">
-                          {it.image && <img src={it.image} alt={it.name} className="w-16 h-16 object-cover rounded" />}
-                          <div>
-                            <div className="font-medium">{it.name} — {it.price} kr</div>
-                            <div className="text-sm text-gray-600">{it.description}</div>
-                          </div>
-                        </div>
-                        <div>
-                          <button className="px-3 py-1 bg-forest text-white" onClick={() => addToCart(it)}>Add</button>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
+            <div>
+              <div className="flex gap-2 mb-4 flex-wrap">
+                {tabs.map(t => (
+                  <button key={t} className={`px-3 py-1 rounded ${t === activeTab ? 'bg-forest text-white' : 'bg-gray-100'}`} onClick={() => setActiveTab(t)}>{t}</button>
+                ))}
+              </div>
+
+              <ul className="space-y-3">
+                {filtered.map(it => (
+                  <li key={it.id} className="p-3 border rounded flex justify-between items-center">
+                    <div className="flex items-center gap-3">
+                      {it.image && <img src={it.image} alt={it.name} className="w-16 h-16 object-cover rounded" />}
+                      <div>
+                        <div className="font-medium">{it.name} — {it.price} kr</div>
+                        <div className="text-sm text-gray-600">{it.description}</div>
+                      </div>
+                    </div>
+                    <div>
+                      <button className="px-3 py-1 bg-forest text-white" onClick={() => addToCart(it)}>Add</button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
             </div>
           )
         })()}
