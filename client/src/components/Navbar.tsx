@@ -20,7 +20,16 @@ function classNames(...classes: string[]) {
   return classes.filter(Boolean).join(" ");
 }
 
-export default function Navbar() {
+export default function Navbar({ view, setView }: { view?: string, setView?: (v: string) => void }) {
+  const go = (v: string) => { if (setView) setView(v) }
+  const mapNameToView = (name: string) => {
+    if (name === 'Hjem') return 'home'
+    if (name === 'Meny') return 'menu'
+    if (name === 'Bestill') return 'order'
+    if (name === 'For Admin') return 'admin'
+    return ''
+  }
+
   return (
     <Disclosure
       as="nav"
@@ -51,21 +60,26 @@ export default function Navbar() {
             </div>
             <div className="hidden sm:ml-6 sm:block">
               <div className="flex space-x-4">
-                {navigation.map((item) => (
-                  <a
-                    key={item.name}
-                    href={item.href}
-                    aria-current={item.current ? "page" : undefined}
-                    className={classNames(
-                      item.current
-                        ? "bg-chili text-white"
-                        : "text-cream hover:bg-white/5 hover:text-marigold",
-                      "rounded-md px-3 py-2 text-sm font-medium",
-                    )}
-                  >
-                    {item.name}
-                  </a>
-                ))}
+                {navigation.map((item) => {
+                  const v = mapNameToView(item.name)
+                  const isActive = view === v
+                  return (
+                    <a
+                      key={item.name}
+                      href={item.href}
+                      onClick={(e) => { e.preventDefault(); if (v) go(v) }}
+                      aria-current={isActive ? "page" : undefined}
+                      className={classNames(
+                        isActive
+                          ? "bg-chili text-white"
+                          : "text-cream hover:bg-white/5 hover:text-marigold",
+                        "rounded-md px-3 py-2 text-sm font-medium",
+                      )}
+                    >
+                      {item.name}
+                    </a>
+                  )
+                })}
               </div>
             </div>
           </div>
@@ -74,22 +88,27 @@ export default function Navbar() {
 
       <DisclosurePanel className="sm:hidden">
         <div className="space-y-1 px-2 pt-2 pb-3">
-          {navigation.map((item) => (
-            <DisclosureButton
-              key={item.name}
-              as="a"
-              href={item.href}
-              aria-current={item.current ? "page" : undefined}
-              className={classNames(
-                item.current
-                  ? "bg-chili text-white"
-                  : "text-cream hover:bg-white/5 hover:text-marigold",
-                "block rounded-md px-3 py-2 text-base font-medium",
-              )}
-            >
-              {item.name}
-            </DisclosureButton>
-          ))}
+          {navigation.map((item) => {
+            const v = mapNameToView(item.name)
+            const isActive = view === v
+            return (
+              <DisclosureButton
+                key={item.name}
+                as="a"
+                href={item.href}
+                onClick={(e) => { e.preventDefault(); if (v && setView) setView(v) }}
+                aria-current={isActive ? "page" : undefined}
+                className={classNames(
+                  isActive
+                    ? "bg-chili text-white"
+                    : "text-cream hover:bg-white/5 hover:text-marigold",
+                  "block rounded-md px-3 py-2 text-base font-medium",
+                )}
+              >
+                {item.name}
+              </DisclosureButton>
+            )
+          })}
         </div>
       </DisclosurePanel>
     </Disclosure>
