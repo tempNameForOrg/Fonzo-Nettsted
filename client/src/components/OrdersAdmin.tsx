@@ -24,8 +24,15 @@ export default function OrdersAdmin() {
 
   const deleteOrder = async (id: string) => {
     try {
-      await fetch(`/api/orders/${id}`, { method: 'DELETE' })
-      fetchOrders()
+      const res = await fetch(`/api/orders/${encodeURIComponent(id)}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const body = await res.text().catch(() => '')
+        console.error('Delete failed', res.status, body)
+        alert('Kunne ikke fjerne bestillingen (' + res.status + ')')
+        return
+      }
+      // optimistic update
+      setOrders(prev => prev.filter(o => o.id !== id))
     } catch (e) {
       console.error('Failed to delete order', e)
       alert('Kunne ikke fjerne bestillingen')
@@ -57,9 +64,7 @@ export default function OrdersAdmin() {
                 </li>
               ))}
             </ul>
-            <div className="flex gap-2">
-              <button className="px-3 py-1 bg-chili text-white" onClick={() => deleteOrder(o.id)}>Ferdig</button>
-            </div>
+            
           </div>
         ))}
       </div>
