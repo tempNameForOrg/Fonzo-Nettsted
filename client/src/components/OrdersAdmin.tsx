@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 
-type OrderItem = { id?: string, name: string, price: number, qty: number }
+type OrderItem = { id?: string, name: string, price: number, qty: number, image?: string }
 type Order = { id: string, items: OrderItem[], total: number, status: string, createdAt: number }
 
 export default function OrdersAdmin() {
@@ -58,8 +58,11 @@ export default function OrdersAdmin() {
             </div>
             <ul className="mb-2">
               {o.items.map((it, i) => (
-                <li key={i} className="flex justify-between">
-                  <div>{it.name} x{it.qty}</div>
+                <li key={i} className="flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    {it.image && <img src={it.image} alt={it.name} className="w-12 h-12 object-cover rounded" />}
+                    <div>{it.name} x{it.qty}</div>
+                  </div>
                   <div>{(it.price * it.qty).toFixed(0)} kr</div>
                 </li>
               ))}
