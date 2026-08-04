@@ -30,6 +30,8 @@ return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex flex-col items-center justify-center">
       <div className="w-100 bg-cream">
         <Canvas>
+          <axesHelper args={[20]} />
+          <gridHelper args={[20, 20, "red", blue]} />
           <GizmoHelper alignment="bottom-right" margin={[50, 50]}>
             <GizmoViewport />
           </GizmoHelper>
