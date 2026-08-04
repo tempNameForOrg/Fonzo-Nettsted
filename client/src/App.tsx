@@ -5,6 +5,7 @@ import Googleapi from "./components/Googleapi"
 import Aapningstider from "./components/Aapningstider"
 import TacoHero from "./components/Tacohero"
 import MenuAdmin from "./components/MenuAdmin"
+import OrderMenu from "./components/OrderMenu"
 
 type View = "home" | "menu" | "order" | "admin"
 
@@ -30,14 +31,17 @@ function App() {
         )}
 
         {view === "menu" && (
-          <section id="Menu">
-            <div className="p-4">Menu view (TODO)</div>
+          <section id="Menu" className="p-4">
+            <div className="max-w-3xl mx-auto">
+              <h2 className="text-2xl font-semibold mb-4">Meny</h2>
+              <div className="text-sm text-gray-600">Se våre retter under Bestill (Bestill viser kun menyens retter).</div>
+            </div>
           </section>
         )}
 
         {view === "order" && (
-          <section id="Order">
-            <div className="p-4">Order view (TODO)</div>
+          <section id="Order" className="p-4">
+            <OrderMenu />
           </section>
         )}
 
