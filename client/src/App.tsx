@@ -70,17 +70,15 @@ function App() {
         )}
       </main>
 
-      {view !== 'admin' && (
-        <>
-          <section id="Info">
-            <Aapningstider />
-            <Googleapi />
-          </section>
-          <section id="Footer">
-            <Footer />
-          </section>
-        </>
+      {view !== 'admin' && view !== 'order' && (
+        <section id="Info">
+          <Aapningstider />
+          <Googleapi />
+        </section>
       )}
+      <section id="Footer">
+        <Footer />
+      </section>
     </>
   )
 }
