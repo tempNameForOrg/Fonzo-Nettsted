@@ -3,7 +3,7 @@ import React from "react";
 const Aapningstider = () => {
   return (
     <>
-      <div className="relative h-[300vh]">
+      <div className="relative h-[200vh]">
         <div className="sticky top-0 h-screen color-olive flex flex-col items-center">
           <div className="flex my-5 items-center justify-center pointer-events-none">
             <h1 className="text-center text-center text-6xl font-bold text-forest">
