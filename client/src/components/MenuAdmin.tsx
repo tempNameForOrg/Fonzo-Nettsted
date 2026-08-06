@@ -9,6 +9,7 @@ type MenuItem = {
   category?: string
   image?: string
   allergens?: string
+  customization_options?: string[] | string | null
 }
 
 const MenuAdmin: React.FC = () => {
@@ -16,6 +17,21 @@ const MenuAdmin: React.FC = () => {
   const [editing, setEditing] = useState<Partial<MenuItem> | null>(null)
   const [categories, setCategories] = useState<Array<{ id: string, name: string }>>([])
   const [newCategory, setNewCategory] = useState('')
+
+  const formatCustomizationOptions = (value?: MenuItem['customization_options']) => {
+    if (!value) return ''
+    if (Array.isArray(value)) return value.join('\n')
+    return String(value)
+  }
+
+  const parseCustomizationOptions = (value?: string | string[] | null) => {
+    if (!value) return [] as string[]
+    if (Array.isArray(value)) return value.map((entry) => String(entry).trim()).filter(Boolean)
+    return String(value)
+      .split('\n')
+      .map((entry) => entry.trim())
+      .filter(Boolean)
+  }
 
   useEffect(() => { fetchItems() }, [])
 
@@ -40,10 +56,11 @@ const MenuAdmin: React.FC = () => {
   const save = async (item: Partial<MenuItem>) => {
     if (!item.image) { alert('Image is required'); return }
     if (!item.category) { alert('Category is required'); return }
+    const customization_options = parseCustomizationOptions(item.customization_options)
     if (item.id) {
-      await fetch(`/api/menu/${item.id}`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(item) })
+      await fetch(`/api/menu/${item.id}`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...item, customization_options }) })
     } else {
-      await fetch('/api/menu', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(item) })
+      await fetch('/api/menu', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...item, customization_options }) })
     }
     setEditing(null)
     fetchItems()
@@ -114,6 +131,14 @@ const MenuAdmin: React.FC = () => {
           <textarea className="w-full p-1 border" value={editing.description || ''} onChange={(e) => setEditing({ ...editing, description: e.target.value })} />
           <label className="block mt-2">Allergens / special diet notes</label>
           <input className="w-full p-1 border" value={editing.allergens || ''} onChange={(e) => setEditing({ ...editing, allergens: e.target.value })} placeholder="f.eks. gluten, melk, sesam" />
+          <label className="block mt-2">Customization options</label>
+          <textarea
+            className="w-full p-1 border"
+            rows={5}
+            value={formatCustomizationOptions(editing.customization_options)}
+            onChange={(e) => setEditing({ ...editing, customization_options: e.target.value })}
+            placeholder={"One option per line\nUten løk\nEkstra salsa\nMild\nSterk"}
+          />
           <label className="block mt-2">Image URL (or upload)</label>
           <input className="w-full p-1 border" value={editing.image || ''} onChange={(e) => setEditing({ ...editing, image: e.target.value })} />
           <input className="mt-2" type="file" accept="image/*" onChange={async (e) => {
@@ -140,6 +165,9 @@ const MenuAdmin: React.FC = () => {
                 <div className="text-sm">{it.description}</div>
                 <div className="text-xs text-gray-500">{it.category}</div>
                 {it.allergens && <div className="mt-1 text-xs text-amber-700">Allergi: {it.allergens}</div>}
+                {Array.isArray(it.customization_options) && it.customization_options.length > 0 && (
+                  <div className="mt-1 text-xs text-gray-600">Tilpasninger: {it.customization_options.join(', ')}</div>
+                )}
               </div>
             </div>
             <div className="flex gap-2">

@@ -1,11 +1,7 @@
 import React, { useEffect, useState } from 'react'
 
 type OrderItemCustomization = {
-  spiceLevel?: string
-  removedIngredients?: string
-  extras?: string
-  allergyNotes?: string
-  servingNote?: string
+  selectedOptions?: string[]
   raw?: string
 }
 
@@ -44,11 +40,7 @@ export default function OrdersAdmin() {
     const parsed = parseCustomization(customization)
     if (!parsed) return []
     return [
-      parsed.spiceLevel ? `Krydder: ${parsed.spiceLevel}` : '',
-      parsed.removedIngredients ? `Uten: ${parsed.removedIngredients}` : '',
-      parsed.extras ? `Ekstra: ${parsed.extras}` : '',
-      parsed.allergyNotes ? `Allergi: ${parsed.allergyNotes}` : '',
-      parsed.servingNote ? `Notat: ${parsed.servingNote}` : '',
+      ...(parsed.selectedOptions || []).map((option) => `Valgt: ${option}`),
       parsed.raw ? `Rådata: ${parsed.raw}` : '',
     ].filter(Boolean)
   }
