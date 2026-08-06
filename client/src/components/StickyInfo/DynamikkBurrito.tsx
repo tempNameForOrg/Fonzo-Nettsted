@@ -223,8 +223,19 @@ function Taco() {
     </>
   );
 }
+export function BurritoCanvas({ className = "" }: { className?: string }) {
+  return (
+    <Canvas
+      className={`!absolute !inset-0 !h-full !w-full ${className}`}
+      camera={{ position: [1.5, 0, 0], fov: 90 }}
+    >
+      <ambientLight intensity={2} position={[2, 2, 2]} />
+      <Taco />
+    </Canvas>
+  );
+}
 
-export default function TacoHero() {
+export default function BurritoDev() {
   return (
     <>
       <div className="mx-auto min-h-screen max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -233,20 +244,15 @@ export default function TacoHero() {
             className="!inset-0 !absolute !h-full !w-full"
             camera={{ position: [1.5, 0, 0], fov: 90 }}
           >
-            {/* <axesHelper args={[20]} />
+            <axesHelper args={[20]} />
             <gridHelper args={[20, 20, "red", "blue"]} />
             <GizmoHelper alignment="bottom-right" margin={[50, 50]}>
               <GizmoViewport />
             </GizmoHelper>
-            <OrbitControls /> */}
+            <OrbitControls />
             <ambientLight intensity={2} position={[2, 2, 2]} />
             <Taco />
           </Canvas>
-          <div className="absolute z-50 flex min-h-screen items-center justify-center pointer-events-none">
-            <h1 className="text-center text-center text-9xl font-bold text-forest">
-              Fonzo Taco
-            </h1>
-          </div>
         </div>
       </div>
     </>
