@@ -8,6 +8,7 @@ type MenuItem = {
   available: boolean
   category?: string
   image?: string
+  allergens?: string
 }
 
 const MenuAdmin: React.FC = () => {
@@ -111,6 +112,8 @@ const MenuAdmin: React.FC = () => {
           <input className="w-full p-1 border" value={String(editing.price ?? 0)} onChange={(e) => setEditing({ ...editing, price: Number(e.target.value) })} />
           <label className="block mt-2">Description</label>
           <textarea className="w-full p-1 border" value={editing.description || ''} onChange={(e) => setEditing({ ...editing, description: e.target.value })} />
+          <label className="block mt-2">Allergens / special diet notes</label>
+          <input className="w-full p-1 border" value={editing.allergens || ''} onChange={(e) => setEditing({ ...editing, allergens: e.target.value })} placeholder="f.eks. gluten, melk, sesam" />
           <label className="block mt-2">Image URL (or upload)</label>
           <input className="w-full p-1 border" value={editing.image || ''} onChange={(e) => setEditing({ ...editing, image: e.target.value })} />
           <input className="mt-2" type="file" accept="image/*" onChange={async (e) => {
@@ -136,6 +139,7 @@ const MenuAdmin: React.FC = () => {
                 <div className="font-medium">{it.name} — {it.price} kr</div>
                 <div className="text-sm">{it.description}</div>
                 <div className="text-xs text-gray-500">{it.category}</div>
+                {it.allergens && <div className="mt-1 text-xs text-amber-700">Allergi: {it.allergens}</div>}
               </div>
             </div>
             <div className="flex gap-2">
