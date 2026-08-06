@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 
 type OrderItemCustomization = {
-  selectedOptions?: string[]
+  optionQuantities?: Record<string, number>
   raw?: string
 }
 
@@ -40,7 +40,7 @@ export default function OrdersAdmin() {
     const parsed = parseCustomization(customization)
     if (!parsed) return []
     return [
-      ...(parsed.selectedOptions || []).map((option) => `Valgt: ${option}`),
+      ...(parsed.optionQuantities ? Object.entries(parsed.optionQuantities).filter(([, qty]) => qty > 0).map(([option, qty]) => `${option} x${qty}`) : []),
       parsed.raw ? `Rådata: ${parsed.raw}` : '',
     ].filter(Boolean)
   }
@@ -54,7 +54,6 @@ export default function OrdersAdmin() {
         alert('Kunne ikke fjerne bestillingen (' + res.status + ')')
         return
       }
-      // optimistic update
       setOrders(prev => prev.filter(o => o.id !== id))
     } catch (e) {
       console.error('Failed to delete order', e)
@@ -67,7 +66,7 @@ export default function OrdersAdmin() {
       <div className="mb-4 flex items-end justify-between gap-3">
         <div>
           <h2 className="text-2xl font-semibold">Bestillinger</h2>
-          <p className="text-sm text-gray-600">Kjøkkenvisning med ingrediensvalg, allerginotater og spesialbestillinger per vare.</p>
+          <p className="text-sm text-gray-600">Kjøkkenvisning med mengdevalg per tillegg på hver rett.</p>
         </div>
       </div>
       {loading && <div>Loading...</div>}

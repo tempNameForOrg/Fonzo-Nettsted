@@ -13,14 +13,12 @@ type MenuItem = {
 }
 
 type Customization = {
-  selectedOptions: string[]
+  optionQuantities: Record<string, number>
 }
 
 type CartItem = MenuItem & { qty: number; customization: Customization }
 
-const createCustomization = (): Customization => ({
-  selectedOptions: [],
-})
+const createCustomization = (): Customization => ({ optionQuantities: {} })
 
 const customizationKey = (customization: Customization) => JSON.stringify(customization)
 
@@ -43,7 +41,10 @@ const splitValues = (value?: string | null) =>
     .map((entry) => entry.trim())
     .filter(Boolean)
 
-const customizationSummary = (customization: Customization) => customization.selectedOptions.map((option) => `Valgt: ${option}`)
+const optionSummary = (customization: Customization) =>
+  Object.entries(customization.optionQuantities)
+    .filter(([, qty]) => qty > 0)
+    .map(([option, qty]) => `${option} x${qty}`)
 
 export default function OrderMenu() {
   const [menu, setMenu] = useState<MenuItem[]>([])
@@ -88,12 +89,33 @@ export default function OrderMenu() {
     setDraftQty(1)
   }
 
-  const updateSelectedOption = (option: string, enabled: boolean) => {
+  const setOptionQty = (option: string, qty: number) => {
     setDraftCustomization((current) => ({
-      selectedOptions: enabled
-        ? Array.from(new Set([...current.selectedOptions, option]))
-        : current.selectedOptions.filter((existing) => existing !== option),
+      optionQuantities: {
+        ...current.optionQuantities,
+        [option]: Math.max(0, qty),
+      },
     }))
+  }
+
+  const bumpOptionQty = (option: string, delta: number) => {
+    setDraftCustomization((current) => {
+      const currentQty = current.optionQuantities[option] || 0
+      return {
+        optionQuantities: {
+          ...current.optionQuantities,
+          [option]: Math.max(0, currentQty + delta),
+        },
+      }
+    })
+  }
+
+  const clearOption = (option: string) => {
+    setDraftCustomization((current) => {
+      const next = { ...current.optionQuantities }
+      delete next[option]
+      return { optionQuantities: next }
+    })
   }
 
   const addToCart = (item: MenuItem, qty: number, customization: Customization) => {
@@ -168,13 +190,15 @@ export default function OrderMenu() {
     }
   }
 
+  const selectedOptions = normalizeOptions(selectedItem?.customization_options)
+
   return (
     <div className="mx-auto max-w-6xl pb-40 lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-6">
       <div className="min-w-0">
         <div className="mb-4 flex items-end justify-between gap-3">
           <div>
             <h2 className="text-2xl font-semibold">Meny</h2>
-            <p className="text-sm text-gray-600">Trykk på en rett for å åpne en overlay og velge forhåndsdefinerte alternativer fra admin.</p>
+            <p className="text-sm text-gray-600">Trykk på en rett for å åpne overlay og velge mengde per alternativ.</p>
           </div>
         </div>
 
@@ -226,14 +250,14 @@ export default function OrderMenu() {
       <aside className="mt-6 space-y-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm lg:mt-0 lg:sticky lg:top-4 lg:h-fit">
         <div>
           <h3 className="text-lg font-semibold">Handlekurv</h3>
-          <div className="text-sm text-gray-600">Detaljer og spesialiseringer lagres på hver ordrelinje.</div>
+          <div className="text-sm text-gray-600">Valg med mengde lagres per ordrelinje.</div>
         </div>
 
         {cart.length === 0 && <div className="text-sm text-gray-600">Ingen varer ennå</div>}
 
         <ul className="space-y-3">
           {cart.map((item) => {
-            const details = customizationSummary(item.customization)
+            const details = optionSummary(item.customization)
             return (
               <li key={`${item.id}-${customizationKey(item.customization)}`} className="rounded-xl border border-gray-200 p-3">
                 <div className="flex items-start justify-between gap-3">
@@ -287,7 +311,7 @@ export default function OrderMenu() {
                 <div>
                   <div className="text-sm uppercase tracking-[0.3em] text-gray-500">Spesialiser bestillingen</div>
                   <h3 className="mt-1 text-2xl font-semibold">{selectedItem.name}</h3>
-                  <p className="text-sm text-gray-600">Velg blant alternativene som er satt opp av admin.</p>
+                  <p className="text-sm text-gray-600">Velg hvor mye av hvert alternativ kunden skal ha.</p>
                 </div>
                 <button className="rounded-full border border-gray-300 px-3 py-2 text-sm font-semibold" onClick={() => setSelectedItem(null)}>
                   Lukk
@@ -305,32 +329,51 @@ export default function OrderMenu() {
                     <div className="text-sm text-gray-600">{selectedItem.description}</div>
                   </div>
 
-                  {normalizeOptions(selectedItem.customization_options).length > 0 ? (
+                  {selectedOptions.length > 0 ? (
                     <div>
-                      <div className="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-500">Valg</div>
-                      <div className="flex flex-wrap gap-2">
-                        {normalizeOptions(selectedItem.customization_options).map((option) => {
-                          const active = draftCustomization.selectedOptions.includes(option)
+                      <div className="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-500">Alternativer</div>
+                      <div className="space-y-2">
+                        {selectedOptions.map((option) => {
+                          const qty = draftCustomization.optionQuantities[option] || 0
                           return (
-                            <button
-                              key={option}
-                              className={`rounded-full border px-4 py-2 text-sm font-medium transition ${active ? 'border-forest bg-forest text-white' : 'border-gray-300 bg-white text-gray-700'}`}
-                              onClick={() => updateSelectedOption(option, !active)}
-                            >
-                              {option}
-                            </button>
+                            <div key={option} className="flex items-center justify-between gap-3 rounded-2xl border border-gray-200 px-3 py-2">
+                              <div className="min-w-0">
+                                <div className="font-medium">{option}</div>
+                                <div className="text-xs text-gray-500">Bruk + og - for mengde.</div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <button className="rounded-lg border border-gray-300 px-3 py-2" onClick={() => bumpOptionQty(option, -1)}>
+                                  -
+                                </button>
+                                <input
+                                  className="w-14 rounded-lg border border-gray-300 p-2 text-center"
+                                  type="number"
+                                  min={0}
+                                  value={qty}
+                                  onChange={(e) => setOptionQty(option, Number(e.target.value) || 0)}
+                                />
+                                <button className="rounded-lg border border-gray-300 px-3 py-2" onClick={() => bumpOptionQty(option, 1)}>
+                                  +
+                                </button>
+                                {qty > 0 && (
+                                  <button className="rounded-lg border border-gray-300 px-3 py-2 text-xs" onClick={() => clearOption(option)}>
+                                    Nullstill
+                                  </button>
+                                )}
+                              </div>
+                            </div>
                           )
                         })}
                       </div>
                     </div>
                   ) : (
                     <div className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
-                      Denne retten har ingen forhåndsdefinerte valg enda. Legg dem inn i edit menu.
+                      Denne retten har ingen forhåndsdefinerte alternativer enda. Legg dem inn i edit menu.
                     </div>
                   )}
 
                   <label className="block text-sm font-medium">
-                    Antall
+                    Antall retter
                     <div className="mt-1 flex items-center gap-2">
                       <button className="rounded-lg border border-gray-300 px-3 py-2" onClick={() => setDraftQty((current) => Math.max(1, current - 1))}>
                         -
@@ -343,7 +386,7 @@ export default function OrderMenu() {
                   </label>
 
                   <div className="flex flex-wrap gap-2">
-                    {customizationSummary(draftCustomization).map((tag) => (
+                    {optionSummary(draftCustomization).map((tag) => (
                       <span key={tag} className="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-700">
                         {tag}
                       </span>

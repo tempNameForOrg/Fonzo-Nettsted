@@ -137,7 +137,7 @@ const MenuAdmin: React.FC = () => {
             rows={5}
             value={formatCustomizationOptions(editing.customization_options)}
             onChange={(e) => setEditing({ ...editing, customization_options: e.target.value })}
-            placeholder={"One option per line\nUten løk\nEkstra salsa\nMild\nSterk"}
+            placeholder={"One option per line\nEkstra kjøtt\nEkstra ost\nMild\nSterk"}
           />
           <label className="block mt-2">Image URL (or upload)</label>
           <input className="w-full p-1 border" value={editing.image || ''} onChange={(e) => setEditing({ ...editing, image: e.target.value })} />
