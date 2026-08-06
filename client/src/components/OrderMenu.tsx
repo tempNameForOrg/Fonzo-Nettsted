@@ -6,6 +6,8 @@ type MenuItem = {
   description?: string
   price: number
   available: boolean
+  category?: string
+  image?: string
 }
 
 type CartItem = MenuItem & { qty: number }
@@ -14,6 +16,7 @@ export default function OrderMenu() {
   const [menu, setMenu] = useState<MenuItem[]>([])
   const [cart, setCart] = useState<CartItem[]>([])
   const [loading, setLoading] = useState(false)
+  const [activeTab, setActiveTab] = useState<string>('All')
 
   useEffect(() => { fetchMenu() }, [])
 
@@ -43,7 +46,7 @@ export default function OrderMenu() {
   const placeOrder = async () => {
     if (cart.length === 0) { alert('Cart is empty'); return }
     const payload = {
-      items: cart.map(({ id, name, price, qty }) => ({ id, name, price, qty })),
+      items: cart.map(({ id, name, price, qty, image }) => ({ id, name, price, qty, image })),
       total: cart.reduce((s, it) => s + it.price * it.qty, 0),
       status: 'placed'
     }
@@ -75,19 +78,39 @@ export default function OrderMenu() {
       <div className="md:col-span-2">
         <h2 className="text-2xl font-semibold mb-4">Meny</h2>
         {loading && <div>Loading...</div>}
-        <ul className="space-y-3">
-          {menu.map(it => (
-            <li key={it.id} className="p-3 border rounded flex justify-between items-center">
-              <div>
-                <div className="font-medium">{it.name} — {it.price} kr</div>
-                <div className="text-sm text-gray-600">{it.description}</div>
+        {/* category tabs */}
+        {(() => {
+          const rawCats = Array.from(new Set(menu.map(m => (m.category || 'Uten kategori'))))
+          rawCats.sort()
+          const tabs = ['All', ...rawCats]
+          const filtered = activeTab === 'All' ? menu : menu.filter(m => (m.category || 'Uten kategori') === activeTab)
+          return (
+            <div>
+              <div className="flex gap-2 mb-4 flex-wrap">
+                {tabs.map(t => (
+                  <button key={t} className={`px-3 py-1 rounded ${t === activeTab ? 'bg-forest text-white' : 'bg-gray-100'}`} onClick={() => setActiveTab(t)}>{t}</button>
+                ))}
               </div>
-              <div>
-                <button className="px-3 py-1 bg-forest text-white" onClick={() => addToCart(it)}>Add</button>
-              </div>
-            </li>
-          ))}
-        </ul>
+
+              <ul className="space-y-3">
+                {filtered.map(it => (
+                  <li key={it.id} className="p-3 border rounded flex justify-between items-center">
+                    <div className="flex items-center gap-3">
+                      {it.image && <img src={it.image} alt={it.name} className="w-16 h-16 object-cover rounded" />}
+                      <div>
+                        <div className="font-medium">{it.name} — {it.price} kr</div>
+                        <div className="text-sm text-gray-600">{it.description}</div>
+                      </div>
+                    </div>
+                    <div>
+                      <button className="px-3 py-1 bg-forest text-white" onClick={() => addToCart(it)}>Add</button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )
+        })()}
       </div>
 
       <aside className="p-3 border rounded">
@@ -96,10 +119,13 @@ export default function OrderMenu() {
         <ul className="space-y-2 mb-3">
           {cart.map(it => (
             <li key={it.id} className="flex justify-between items-center">
-              <div>
-                <div className="font-medium">{it.name}</div>
-                <div className="text-sm">{it.price} kr</div>
-              </div>
+                <div className="flex items-center gap-2">
+                  {it.image && <img src={it.image} alt={it.name} className="w-12 h-12 object-cover rounded" />}
+                  <div>
+                    <div className="font-medium">{it.name}</div>
+                    <div className="text-sm">{it.price} kr</div>
+                  </div>
+                </div>
               <div className="flex items-center gap-2">
                 <input className="w-14 p-1 border" type="number" value={it.qty} onChange={(e) => changeQty(it.id, Number(e.target.value))} />
                 <div className="font-medium">{(it.price * it.qty).toFixed(0)} kr</div>

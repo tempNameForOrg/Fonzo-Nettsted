@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS menu_items (
   category TEXT,
   available INTEGER NOT NULL DEFAULT 1,
   position INTEGER NOT NULL DEFAULT 0,
+  image TEXT,
   createdAt INTEGER NOT NULL,
   updatedAt INTEGER NOT NULL
 );
@@ -33,9 +34,16 @@ CREATE TABLE IF NOT EXISTS order_items (
   order_id TEXT NOT NULL,
   menu_item_id TEXT,
   name TEXT NOT NULL,
+  image TEXT,
   price REAL NOT NULL DEFAULT 0,
   qty INTEGER NOT NULL DEFAULT 1,
   FOREIGN KEY(order_id) REFERENCES orders(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS categories (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  createdAt INTEGER NOT NULL
 );
 `
 
@@ -45,6 +53,18 @@ if (!fs.existsSync(DB_FILE)) {
 
 const db = new Database(DB_FILE)
 db.exec(initSql)
+
+// ensure image column exists (in case DB created before this change)
+try {
+  const cols = db.prepare("PRAGMA table_info(menu_items)").all().map(c => c.name)
+  if (!cols.includes('image')) {
+    db.prepare('ALTER TABLE menu_items ADD COLUMN image TEXT').run()
+  }
+  const itemCols = db.prepare("PRAGMA table_info(order_items)").all().map(c => c.name)
+  if (!itemCols.includes('image')) {
+    db.prepare('ALTER TABLE order_items ADD COLUMN image TEXT').run()
+  }
+} catch (e) { console.warn('could not ensure image column', e) }
 
 // helper
 function now() { return Date.now() }
@@ -75,7 +95,7 @@ app.get('/api/menu', (req, res) => {
 app.get('/api/orders', (req, res) => {
   const rows = db.prepare('SELECT * FROM orders ORDER BY createdAt DESC').all()
   const result = rows.map(r => {
-    const items = db.prepare('SELECT menu_item_id as id, name, price, qty FROM order_items WHERE order_id = ?').all(r.id)
+    const items = db.prepare('SELECT menu_item_id as id, name, image, price, qty FROM order_items WHERE order_id = ?').all(r.id)
     return { ...r, items }
   })
   res.json(result)
@@ -85,7 +105,7 @@ app.get('/api/orders/:id', (req, res) => {
   const id = req.params.id
   const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(id)
   if (!order) return res.status(404).json({ error: 'not found' })
-  const items = db.prepare('SELECT menu_item_id as id, name, price, qty FROM order_items WHERE order_id = ?').all(id)
+  const items = db.prepare('SELECT menu_item_id as id, name, image, price, qty FROM order_items WHERE order_id = ?').all(id)
   res.json({ ...order, items })
 })
 
@@ -96,11 +116,11 @@ app.post('/api/orders', (req, res) => {
   const createdAt = now()
   const updatedAt = createdAt
   const insertOrder = db.prepare('INSERT INTO orders (id,total,status,createdAt,updatedAt) VALUES (?,?,?,?,?)')
-  const insertItem = db.prepare('INSERT INTO order_items (order_id,menu_item_id,name,price,qty) VALUES (?,?,?,?,?)')
+  const insertItem = db.prepare('INSERT INTO order_items (order_id,menu_item_id,name,image,price,qty) VALUES (?,?,?,?,?,?)')
   const tx = db.transaction((orderId, itemsArr) => {
     insertOrder.run(orderId, Number(total), status, createdAt, updatedAt)
     for (const it of itemsArr) {
-      insertItem.run(orderId, it.id || null, it.name || '', Number(it.price || 0), Number(it.qty || 1))
+      insertItem.run(orderId, it.id || null, it.name || '', it.image || null, Number(it.price || 0), Number(it.qty || 1))
     }
   })
   try {
@@ -141,23 +161,24 @@ app.delete('/api/orders/:id', (req, res) => {
 })
 
 app.post('/api/menu', (req, res) => {
-  const { name, description = null, price = 0, category = null, available = true, position = 0 } = req.body
+  const { name, description = null, price = 0, category = null, available = true, position = 0, image = null } = req.body
+  if (!image) return res.status(400).json({ error: 'image required' })
   const id = String(Date.now())
   const createdAt = now()
   const updatedAt = createdAt
-  db.prepare('INSERT INTO menu_items (id,name,description,price,category,available,position,createdAt,updatedAt) VALUES (?,?,?,?,?,?,?,?,?)')
-    .run(id, name, description, Number(price), category, available ? 1 : 0, Number(position), createdAt, updatedAt)
-  const item = { id, name, description, price: Number(price), category, available, position, createdAt, updatedAt }
+  db.prepare('INSERT INTO menu_items (id,name,description,price,category,available,position,image,createdAt,updatedAt) VALUES (?,?,?,?,?,?,?,?,?,?)')
+    .run(id, name, description, Number(price), category, available ? 1 : 0, Number(position), image, createdAt, updatedAt)
+  const item = { id, name, description, price: Number(price), category, available, position, image, createdAt, updatedAt }
   broadcast({ type: 'menu-created', item })
   res.json(item)
 })
 
 app.put('/api/menu/:id', (req, res) => {
   const id = req.params.id
-  const { name, description, price, category, available, position } = req.body
+  const { name, description, price, category, available, position, image } = req.body
   const updatedAt = now()
-  const stmt = db.prepare('UPDATE menu_items SET name = coalesce(?, name), description = coalesce(?, description), price = coalesce(?, price), category = coalesce(?, category), available = coalesce(?, available), position = coalesce(?, position), updatedAt = ? WHERE id = ?')
-  stmt.run(name, description, price !== undefined ? Number(price) : undefined, category, available !== undefined ? (available ? 1 : 0) : undefined, position !== undefined ? Number(position) : undefined, updatedAt, id)
+  const stmt = db.prepare('UPDATE menu_items SET name = coalesce(?, name), description = coalesce(?, description), price = coalesce(?, price), category = coalesce(?, category), available = coalesce(?, available), position = coalesce(?, position), image = coalesce(?, image), updatedAt = ? WHERE id = ?')
+  stmt.run(name, description, price !== undefined ? Number(price) : undefined, category, available !== undefined ? (available ? 1 : 0) : undefined, position !== undefined ? Number(position) : undefined, image !== undefined ? image : undefined, updatedAt, id)
   const item = db.prepare('SELECT * FROM menu_items WHERE id = ?').get(id)
   if (!item) return res.status(404).json({ error: 'not found' })
   item.available = !!item.available
@@ -170,6 +191,44 @@ app.delete('/api/menu/:id', (req, res) => {
   db.prepare('DELETE FROM menu_items WHERE id = ?').run(id)
   broadcast({ type: 'menu-deleted', id })
   res.json({ success: true })
+})
+
+// Categories endpoints
+app.get('/api/categories', (req, res) => {
+  const rows = db.prepare('SELECT id,name,createdAt FROM categories ORDER BY name ASC').all()
+  res.json(rows)
+})
+
+app.post('/api/categories', (req, res) => {
+  const { name } = req.body
+  if (!name || !String(name).trim()) return res.status(400).json({ error: 'name required' })
+  const id = String(Date.now())
+  const createdAt = now()
+  try {
+    db.prepare('INSERT INTO categories (id,name,createdAt) VALUES (?,?,?)').run(id, String(name).trim(), createdAt)
+    const cat = { id, name: String(name).trim(), createdAt }
+    broadcast({ type: 'category-created', category: cat })
+    res.json(cat)
+  } catch (e) {
+    console.error('failed to create category', e)
+    res.status(500).json({ error: 'failed' })
+  }
+})
+
+app.delete('/api/categories/:id', (req, res) => {
+  const id = req.params.id
+  const cat = db.prepare('SELECT * FROM categories WHERE id = ?').get(id)
+  if (!cat) return res.status(404).json({ error: 'not found' })
+  try {
+    // unset category on menu items that referenced this category name
+    db.prepare('UPDATE menu_items SET category = NULL WHERE category = ?').run(cat.name)
+    db.prepare('DELETE FROM categories WHERE id = ?').run(id)
+    broadcast({ type: 'category-deleted', id })
+    res.json({ success: true })
+  } catch (e) {
+    console.error('failed to delete category', e)
+    res.status(500).json({ error: 'failed' })
+  }
 })
 
 const port = process.env.PORT || 4001
