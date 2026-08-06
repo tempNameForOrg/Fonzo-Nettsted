@@ -20,8 +20,6 @@ If you are developing a production application, we recommend using TypeScript wi
 
 
 ### For dev build
-
-vite will pront a url that can be opened to show the website
  
 In two seperate terminals you will run the frontend with "npm run dev" and the backend with npm run api-sql
 
