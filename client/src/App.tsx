@@ -1,13 +1,14 @@
 import { useState } from "react";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
-import Googleapi from "./components/Googleapi";
-import Aapningstider from "./components/Aapningstider";
+import Googleapi from "./components/StickyInfo/Googleapi";
+import Aapningstider from "./components/StickyInfo/Aapningstider";
 import TacoHero from "./components/Tacohero";
 import MenuAdmin from "./components/MenuAdmin";
 import OrdersAdmin from "./components/OrdersAdmin";
 import OrderMenu from "./components/OrderMenu";
 import { ReactLenis, useLenis } from "lenis/react";
+import Timeline from "./components/StickyInfo/Timeline";
 type View = "home" | "menu" | "order" | "admin";
 
 function App() {
@@ -24,16 +25,6 @@ function App() {
         </section>  
 
         <main className="flex-grow">
-          {view === "home" && (
-            <section id="Hero">
-              <div className="color-olive py-5 my-5 bg-cream">
-                <div className="flex flex-col items-center">
-                  <TacoHero />
-                </div>
-              </div>
-            </section>
-          )}
-
           {view === "menu" && (
             <section id="Menu" className="p-4">
               <div className="max-w-3xl mx-auto">
@@ -125,11 +116,7 @@ function App() {
 
         {view !== "admin" && view !== "order" && (
           <section id="Info">
-            <div className="h-[50vh]"></div>
-            <Aapningstider />
-            <div className="h-screen"></div>
-            <Googleapi />
-            <div className="h-screen"></div>
+            <Timeline />
           </section>
         )}
 
