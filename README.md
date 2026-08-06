@@ -23,4 +23,4 @@ If you are developing a production application, we recommend using TypeScript wi
  
 In two seperate terminals you will run the frontend with "npm run dev" and the backend with "npm run api-sql"
 
-Vite will prompt a link in te frontend terminal to view the website
+Vite will prompt a link in te frontend terminal to view the website.
