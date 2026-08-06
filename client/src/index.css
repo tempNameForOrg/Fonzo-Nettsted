@@ -1,6 +1,15 @@
 @import url('https://fonts.googleapis.com/css2?family=Elms+Sans:ital,wght@0,100..900;1,100..900&family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap');
 @import "tailwindcss";
 
+body {
+
+  font-family: "Elms Sans", sans-serif;
+  font-optical-sizing: auto;
+  font-weight: 100;
+  font-style: normal;
+  background-color: #f1c153; /* Gold */
+}
+
 @theme {
   --color-chili: #c7391c;
   --color-marigold: #f1c153;
