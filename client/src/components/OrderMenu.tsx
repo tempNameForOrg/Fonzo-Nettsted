@@ -548,27 +548,58 @@ export default function OrderMenu() {
                         const currentSel = draftSelections[option.id] || option.defaultChoice || choices[0]
                         const isAvailable = option.available !== false
 
+                        const getChoiceStyle = (choiceName: string, isSelected: boolean) => {
+                          const lower = choiceName.toLowerCase()
+                          if (isSelected) {
+                            if (lower.includes('mild')) return 'bg-emerald-600 border-emerald-600 text-white shadow-md scale-[1.02]'
+                            if (lower.includes('medium')) return 'bg-amber-600 border-amber-600 text-white shadow-md scale-[1.02]'
+                            if (lower.includes('sterk') || lower.includes('hot')) return 'bg-chili border-chili text-white shadow-md scale-[1.02]'
+                            return 'bg-forest border-forest text-white shadow-md scale-[1.02]'
+                          }
+                          return 'border-gray-200 bg-gray-50/80 text-gray-700 hover:bg-gray-100 hover:border-gray-300'
+                        }
+
+                        const getChoiceIcon = (choiceName: string, isSelected: boolean) => {
+                          const lower = choiceName.toLowerCase()
+                          if (lower.includes('mild')) return '🟢'
+                          if (lower.includes('medium')) return '🌶️'
+                          if (lower.includes('sterk') || lower.includes('hot')) return '🔥'
+                          return isSelected ? '✓' : '⚪'
+                        }
+
                         return (
-                          <div key={option.id} className="space-y-2 border-b pb-3">
-                            <div className="text-xs font-bold uppercase tracking-wider text-gray-700">
-                              {option.label}
+                          <div key={option.id} className="space-y-2.5 border-b border-gray-100 pb-4">
+                            <div className="flex items-center justify-between">
+                              <label className="text-xs font-bold uppercase tracking-wider text-gray-700">
+                                Velg {option.label}
+                              </label>
+                              <span className="text-xs text-gray-500 font-medium">
+                                Valgt: <strong className="text-forest font-bold">{currentSel}</strong>
+                              </span>
                             </div>
-                            <div className="flex flex-wrap gap-2">
+
+                            <div className="grid grid-cols-3 gap-2.5">
                               {choices.map((choice) => {
                                 const isSelected = currentSel === choice
+                                const isDefault = choice === (option.defaultChoice || choices[0])
                                 return (
                                   <button
                                     key={choice}
                                     type="button"
                                     disabled={!isAvailable}
                                     onClick={() => setChoiceSelection(option.id, choice)}
-                                    className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
+                                    className={`flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-all cursor-pointer text-center ${getChoiceStyle(
+                                      choice,
                                       isSelected
-                                        ? 'bg-forest text-white shadow-sm ring-2 ring-forest/30'
-                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                    } ${!isAvailable ? 'opacity-40 cursor-not-allowed' : ''}`}
+                                    )} ${!isAvailable ? 'opacity-40 cursor-not-allowed' : ''}`}
                                   >
-                                    {choice}
+                                    <div className="text-lg mb-0.5">{getChoiceIcon(choice, isSelected)}</div>
+                                    <div className="text-sm font-bold leading-tight">{choice}</div>
+                                    {isSelected ? (
+                                      <span className="text-[10px] font-bold opacity-90 mt-1 uppercase tracking-wider">✓ Valgt</span>
+                                    ) : isDefault ? (
+                                      <span className="text-[10px] text-gray-400 font-medium mt-1">Standard</span>
+                                    ) : null}
                                   </button>
                                 )
                               })}

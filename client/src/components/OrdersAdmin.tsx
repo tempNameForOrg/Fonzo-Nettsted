@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 
 type OrderItemCustomization = {
   optionQuantities?: Record<string, number>
+  optionSelections?: Record<string, string>
   optionLabels?: Record<string, string>
   details?: string[]
   raw?: string
@@ -63,18 +64,42 @@ export default function OrdersAdmin() {
       return parsed.details
     }
     const labelsMap = parsed.optionLabels || {}
-    const items = parsed.optionQuantities
-      ? Object.entries(parsed.optionQuantities)
-          .filter(([, qty]) => qty > 0)
-          .map(([id, qty]) => {
-            const label = labelsMap[id] || id
-            return `${label} x${qty}`
-          })
-      : []
+    const items: string[] = []
+
+    if (parsed.optionSelections) {
+      for (const [id, choice] of Object.entries(parsed.optionSelections)) {
+        const label = labelsMap[id] || id
+        items.push(`${label}: ${choice}`)
+      }
+    }
+
+    if (parsed.optionQuantities) {
+      for (const [id, qty] of Object.entries(parsed.optionQuantities)) {
+        if (qty > 0) {
+          const label = labelsMap[id] || id
+          items.push(`${label} x${qty}`)
+        }
+      }
+    }
+
     if (parsed.raw) {
       items.push(`Rådata: ${parsed.raw}`)
     }
     return items
+  }
+
+  const getTagBadgeStyle = (label: string) => {
+    const lower = label.toLowerCase()
+    if (lower.startsWith('uten ')) {
+      return 'bg-red-50 text-red-700 border-red-200 font-bold'
+    }
+    if (lower.startsWith('ekstra ')) {
+      return 'bg-emerald-50 text-emerald-800 border-emerald-200 font-bold'
+    }
+    if (lower.includes('styrke') || lower.includes('mild') || lower.includes('medium') || lower.includes('sterk')) {
+      return 'bg-amber-50 text-amber-900 border-amber-200 font-bold'
+    }
+    return 'bg-white text-gray-800 border-gray-200 font-medium'
   }
 
   const deleteOrder = async (id: string) => {
@@ -97,8 +122,8 @@ export default function OrdersAdmin() {
     <section className="space-y-6">
       <div className="flex items-end justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Innkomne Bestillinger</h2>
-          <p className="text-sm text-gray-600">Kjøkkenvisning med alle valgte tilpasninger per rett.</p>
+          <h2 className="text-2xl font-bold text-gray-900">Innkomne Bestillinger (Kjøkken)</h2>
+          <p className="text-sm text-gray-600">Kjøkkenvisning med fokus på endringer og avvik per rett.</p>
         </div>
       </div>
 
@@ -124,7 +149,7 @@ export default function OrdersAdmin() {
               {o.items.map((it, i) => {
                 const labels = customizationLabels(it.customization)
                 return (
-                  <li key={i} className="rounded-2xl border border-gray-100 p-3 bg-gray-50/70">
+                  <li key={i} className="rounded-2xl border border-gray-100 p-3.5 bg-gray-50/70">
                     <div className="flex items-center gap-3">
                       {it.image ? (
                         <img src={it.image} alt={it.name} className="w-12 h-12 object-cover rounded-xl shrink-0 bg-gray-100" />
@@ -132,21 +157,28 @@ export default function OrdersAdmin() {
                         <div className="w-12 h-12 rounded-xl bg-gray-100 shrink-0 flex items-center justify-center text-[10px] text-gray-400">Ikke bilde</div>
                       )}
                       <div className="min-w-0 flex-1">
-                        <div className="font-bold text-gray-900">{it.name} <span className="text-forest">x{it.qty}</span></div>
+                        <div className="font-bold text-gray-900 text-base">{it.name} <span className="text-forest">x{it.qty}</span></div>
                         <div className="text-xs text-gray-500">{it.price} kr stk</div>
                       </div>
                       <div className="font-bold text-gray-800 text-sm">{(it.price * it.qty).toFixed(0)} kr</div>
                     </div>
 
-                    {labels.length > 0 && (
-                      <div className="mt-2 pt-2 border-t border-gray-200/60 flex flex-wrap gap-1.5 text-xs">
-                        {labels.map((label, idx) => (
-                          <span key={idx} className="rounded-md bg-white border border-gray-200 px-2 py-0.5 text-gray-800 font-medium text-[11px]">
+                    <div className="mt-2.5 pt-2 border-t border-gray-200/60 flex flex-wrap gap-1.5 text-xs">
+                      {labels.length > 0 ? (
+                        labels.map((label, idx) => (
+                          <span
+                            key={idx}
+                            className={`rounded-lg border px-2.5 py-1 text-xs shadow-2xs ${getTagBadgeStyle(label)}`}
+                          >
                             {label}
                           </span>
-                        ))}
-                      </div>
-                    )}
+                        ))
+                      ) : (
+                        <span className="rounded-lg bg-gray-100 text-gray-500 border border-gray-200 px-2 py-0.5 text-[11px] font-medium italic">
+                          ✓ Standard porsjon (ingen endringer)
+                        </span>
+                      )}
+                    </div>
                   </li>
                 )
               })}
