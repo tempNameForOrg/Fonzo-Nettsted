@@ -3,6 +3,10 @@ import React, { useEffect, useState } from "react"
 export type CustomizationOption = {
   id: string
   label: string
+  type?: 'quantity' | 'select'
+  choices?: string[]
+  choicesInput?: string
+  defaultChoice?: string
   price?: number
   defaultQty: number
   available: boolean
@@ -20,11 +24,15 @@ export type MenuItem = {
   customization_options?: CustomizationOption[] | string | null
 }
 
-const emptyOption = (label = ''): CustomizationOption => ({
+const emptyOption = (label = '', type: 'quantity' | 'select' = 'quantity'): CustomizationOption => ({
   id: 'opt-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
   label,
+  type,
+  choices: type === 'select' ? ['Mild', 'Medium', 'Sterk'] : undefined,
+  choicesInput: type === 'select' ? 'Mild, Medium, Sterk' : '',
+  defaultChoice: type === 'select' ? 'Medium' : undefined,
   price: 0,
-  defaultQty: 0,
+  defaultQty: type === 'select' ? 0 : 0,
   available: true,
 })
 
@@ -54,6 +62,7 @@ const normalizeOptions = (value?: MenuItem['customization_options'], preserveEmp
         return {
           id: label ? label.toLowerCase().replace(/[^a-z0-9]+/g, '-') : `opt-${index}`,
           label,
+          type: 'quantity' as const,
           price: 0,
           defaultQty: 0,
           available: true,
@@ -70,9 +79,20 @@ const normalizeOptions = (value?: MenuItem['customization_options'], preserveEmp
       if (!preserveEmpty && (!label.trim() || label === '[object Object]')) return null
       if (label === '[object Object]') return null
 
+      const type = option.type === 'select' ? ('select' as const) : ('quantity' as const)
+      const rawChoices = Array.isArray(option.choices)
+        ? option.choices
+        : String(option.choicesInput || option.choices || '').split(',').map((s: string) => s.trim()).filter(Boolean)
+      const choices = rawChoices.map((c: any) => String(c).trim()).filter(Boolean)
+      const defaultChoice = option.defaultChoice ? String(option.defaultChoice).trim() : (choices[0] || '')
+
       return {
         id: String(option.id || (label.trim() ? label.toLowerCase().replace(/[^a-z0-9]+/g, '-') : `opt-${Date.now()}-${index}`)),
         label,
+        type,
+        choices: type === 'select' ? choices : undefined,
+        choicesInput: type === 'select' ? (option.choicesInput ?? choices.join(', ')) : '',
+        defaultChoice: type === 'select' ? defaultChoice : undefined,
         price: Math.max(0, Number(option.price) || 0),
         defaultQty: Math.max(0, Number(option.defaultQty ?? 0) || 0),
         available: option.available !== false,
@@ -112,7 +132,6 @@ const MenuAdmin: React.FC = () => {
 
   const toggleAvailability = async (id: string, currentAvailable: boolean) => {
     const nextAvailable = !currentAvailable
-    // Optimistic update
     setItems((prev) => prev.map((item) => (item.id === id ? { ...item, available: nextAvailable } : item)))
     try {
       const res = await fetch(`/api/menu/${id}`, {
@@ -141,13 +160,23 @@ const MenuAdmin: React.FC = () => {
     // Clean up empty option labels before saving
     const customization_options = rawOptions
       .filter((opt) => opt.label && opt.label.trim() !== '')
-      .map((opt) => ({
-        id: opt.id || opt.label.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-        label: opt.label.trim(),
-        price: Math.max(0, Number(opt.price) || 0),
-        defaultQty: Math.max(0, Number(opt.defaultQty) || 0),
-        available: opt.available !== false,
-      }))
+      .map((opt) => {
+        const type = opt.type === 'select' ? 'select' : 'quantity'
+        const rawChoices = String(opt.choicesInput || (Array.isArray(opt.choices) ? opt.choices.join(', ') : '')).split(',').map(s => s.trim()).filter(Boolean)
+        const choices = type === 'select' ? (rawChoices.length > 0 ? rawChoices : ['Mild', 'Medium', 'Sterk']) : undefined
+        const defaultChoice = type === 'select' ? (opt.defaultChoice?.trim() || choices?.[0] || '') : undefined
+
+        return {
+          id: opt.id || opt.label.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+          label: opt.label.trim(),
+          type,
+          choices,
+          defaultChoice,
+          price: Math.max(0, Number(opt.price) || 0),
+          defaultQty: Math.max(0, Number(opt.defaultQty) || 0),
+          available: opt.available !== false,
+        }
+      })
 
     const payload = {
       ...item,
@@ -186,7 +215,7 @@ const MenuAdmin: React.FC = () => {
       category: categories[0]?.name || '',
       description: '',
       allergens: '',
-      customization_options: [emptyOption('')],
+      customization_options: [emptyOption('', 'quantity')],
       image: '',
     })
   }
@@ -220,13 +249,13 @@ const MenuAdmin: React.FC = () => {
     return normalizeOptions(optionsVal, true)
   }
 
-  const addOption = () => {
+  const addOption = (type: 'quantity' | 'select' = 'quantity') => {
     setEditing((current) => {
       if (!current) return current
       const currentOpts = getOptionsList(current.customization_options)
       return {
         ...current,
-        customization_options: [...currentOpts, emptyOption('')],
+        customization_options: [...currentOpts, emptyOption('', type)],
       }
     })
   }
@@ -260,10 +289,10 @@ const MenuAdmin: React.FC = () => {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Menystyring (Admin)</h2>
-          <p className="text-sm text-gray-600">Legg til retter, tilpasningsvalg og endre status på menyen.</p>
+          <p className="text-sm text-gray-600">Legg til retter, styrkegrad, ingredienser og tilpasninger.</p>
         </div>
         <button
-          className="inline-flex items-center justify-center px-4 py-2.5 bg-forest text-white font-medium rounded-xl shadow-sm hover:bg-forest/90 transition-colors"
+          className="inline-flex items-center justify-center px-4 py-2.5 bg-forest text-white font-medium rounded-xl shadow-sm hover:bg-forest/90 transition-colors cursor-pointer"
           onClick={startNewItem}
         >
           + Legg til ny rett
@@ -279,7 +308,7 @@ const MenuAdmin: React.FC = () => {
             onChange={(e) => setNewCategory(e.target.value)}
             placeholder="Ny kategori (f.eks. Tacos, Drikke)"
           />
-          <button className="px-4 py-2 bg-forest text-white text-sm font-medium rounded-xl hover:bg-forest/90" onClick={addCategory}>
+          <button className="px-4 py-2 bg-forest text-white text-sm font-medium rounded-xl hover:bg-forest/90 cursor-pointer" onClick={addCategory}>
             Legg til
           </button>
         </div>
@@ -287,7 +316,7 @@ const MenuAdmin: React.FC = () => {
           {categories.map(c => (
             <li key={c.id} className="flex justify-between items-center py-2">
               <span className="font-medium text-gray-800">{c.name}</span>
-              <button className="text-xs text-red-600 hover:text-red-800 font-medium" onClick={() => removeCategory(c.id)}>
+              <button className="text-xs text-red-600 hover:text-red-800 font-medium cursor-pointer" onClick={() => removeCategory(c.id)}>
                 Slett
               </button>
             </li>
@@ -302,7 +331,7 @@ const MenuAdmin: React.FC = () => {
             <h3 className="text-lg font-bold text-gray-900">
               {editing.id ? `Rediger rett: ${editing.name || ''}` : 'Ny rett'}
             </h3>
-            <button className="text-gray-400 hover:text-gray-600 text-lg font-bold" onClick={() => setEditing(null)}>
+            <button className="text-gray-400 hover:text-gray-600 text-lg font-bold cursor-pointer" onClick={() => setEditing(null)}>
               ✕
             </button>
           </div>
@@ -375,78 +404,154 @@ const MenuAdmin: React.FC = () => {
             />
           </div>
 
-          <div className="pt-2 border-t border-gray-100">
-            <div className="flex items-center justify-between mb-2">
+          <div className="pt-2 border-t border-gray-100 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
-                <div className="text-sm font-bold text-gray-900">Tilpasningsvalg (Customization options)</div>
-                <div className="text-xs text-gray-500">Valg kunden kan velge antall av (f.eks. Ekstra kjøtt, Ekstra saus).</div>
+                <div className="text-sm font-bold text-gray-900">Tilpasningsvalg & Styrkegrad</div>
+                <div className="text-xs text-gray-500">
+                  Legg til enkeltvalg (Styrkegrad: Mild/Medium/Sterk) eller ingredienser (+/- antall).
+                </div>
               </div>
-              <button
-                type="button"
-                className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-semibold rounded-xl transition-colors cursor-pointer"
-                onClick={addOption}
-              >
-                + Legg til valg
-              </button>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className="px-3 py-1.5 bg-forest/10 hover:bg-forest/20 text-forest text-xs font-bold rounded-xl transition-colors cursor-pointer"
+                  onClick={() => addOption('select')}
+                >
+                  + Styrkegrad / Enkeltvalg
+                </button>
+                <button
+                  type="button"
+                  className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold rounded-xl transition-colors cursor-pointer"
+                  onClick={() => addOption('quantity')}
+                >
+                  + Ingrediens / Tillegg
+                </button>
+              </div>
             </div>
 
             <div className="space-y-3 mt-3">
-              {editingOptions.map((option, index) => (
-                <div key={option.id || index} className="p-3 border border-gray-200 rounded-2xl bg-gray-50/80 space-y-2">
-                  <div className="grid gap-3 sm:grid-cols-[1fr_100px_100px_auto] items-end">
-                    <div>
-                      <label className="block text-[11px] font-semibold text-gray-500 uppercase mb-1">Valgnavn</label>
-                      <input
-                        className="w-full p-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-1 focus:ring-forest"
-                        value={option.label}
-                        onChange={(e) => updateOption(index, { label: e.target.value })}
-                        placeholder="f.eks. Ekstra guacamole"
-                      />
+              {editingOptions.map((option, index) => {
+                const isSelect = option.type === 'select'
+                return (
+                  <div key={option.id || index} className="p-4 border border-gray-200 rounded-2xl bg-gray-50/80 space-y-3">
+                    <div className="flex items-center justify-between border-b pb-2">
+                      <div className="flex items-center gap-2">
+                        <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md ${
+                          isSelect ? 'bg-purple-100 text-purple-800 border border-purple-200' : 'bg-blue-100 text-blue-800 border border-blue-200'
+                        }`}>
+                          {isSelect ? 'Enkeltvalg / Styrkegrad' : 'Ingrediens / Antall (+/-)'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <label className="flex items-center gap-1.5 text-xs font-semibold cursor-pointer">
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 rounded border-gray-300 text-forest focus:ring-forest"
+                            checked={option.available !== false}
+                            onChange={(e) => updateOption(index, { available: e.target.checked })}
+                          />
+                          På lager
+                        </label>
+                        <button
+                          type="button"
+                          className="p-1 text-red-600 hover:text-red-800 text-xs font-bold cursor-pointer"
+                          onClick={() => deleteOption(index)}
+                          title="Fjern valg"
+                        >
+                          Slett
+                        </button>
+                      </div>
                     </div>
-                    <div>
-                      <label className="block text-[11px] font-semibold text-gray-500 uppercase mb-1">Tillegg (kr)</label>
-                      <input
-                        className="w-full p-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-1 focus:ring-forest"
-                        type="number"
-                        min={0}
-                        value={option.price ?? 0}
-                        onChange={(e) => updateOption(index, { price: Number(e.target.value) || 0 })}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-semibold text-gray-500 uppercase mb-1">Standard antall</label>
-                      <input
-                        className="w-full p-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-1 focus:ring-forest"
-                        type="number"
-                        min={0}
-                        value={option.defaultQty}
-                        onChange={(e) => updateOption(index, { defaultQty: Number(e.target.value) || 0 })}
-                      />
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <label className="flex items-center gap-1.5 text-xs font-semibold cursor-pointer">
-                        <input
-                          type="checkbox"
-                          className="h-4 w-4 rounded border-gray-300 text-forest focus:ring-forest"
-                          checked={option.available !== false}
-                          onChange={(e) => updateOption(index, { available: e.target.checked })}
-                        />
-                        På lager
-                      </label>
-                      <button
-                        type="button"
-                        className="p-1 text-red-600 hover:text-red-800 text-xs font-bold cursor-pointer"
-                        onClick={() => deleteOption(index)}
-                        title="Fjern valg"
-                      >
-                        Slett
-                      </button>
-                    </div>
+
+                    {isSelect ? (
+                      /* SELECT TYPE (Styrkegrad, Sausvalg) */
+                      <div className="grid gap-3 sm:grid-cols-3 items-start">
+                        <div>
+                          <label className="block text-[11px] font-semibold text-gray-500 uppercase mb-1">Valggruppe Tittel</label>
+                          <input
+                            className="w-full p-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-1 focus:ring-forest"
+                            value={option.label}
+                            onChange={(e) => updateOption(index, { label: e.target.value })}
+                            placeholder="f.eks. Styrkegrad"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-semibold text-gray-500 uppercase mb-1">Alternativer (komma-separert)</label>
+                          <input
+                            className="w-full p-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-1 focus:ring-forest"
+                            value={option.choicesInput ?? (option.choices ? option.choices.join(', ') : 'Mild, Medium, Sterk')}
+                            onChange={(e) => {
+                              const val = e.target.value
+                              const parsedChoices = val.split(',').map(s => s.trim()).filter(Boolean)
+                              updateOption(index, {
+                                choicesInput: val,
+                                choices: parsedChoices,
+                                defaultChoice: option.defaultChoice || parsedChoices[0] || ''
+                              })
+                            }}
+                            placeholder="Mild, Medium, Sterk"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-semibold text-gray-500 uppercase mb-1">Standardvalg</label>
+                          <input
+                            className="w-full p-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-1 focus:ring-forest"
+                            value={option.defaultChoice || ''}
+                            onChange={(e) => updateOption(index, { defaultChoice: e.target.value })}
+                            placeholder="f.eks. Medium"
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      /* QUANTITY TYPE (Ingredienser, Tillegg) */
+                      <div>
+                        <div className="grid gap-3 sm:grid-cols-3 items-start">
+                          <div>
+                            <label className="block text-[11px] font-semibold text-gray-500 uppercase mb-1">Ingrediens / Tillegg</label>
+                            <input
+                              className="w-full p-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-1 focus:ring-forest"
+                              value={option.label}
+                              onChange={(e) => updateOption(index, { label: e.target.value })}
+                              placeholder="f.eks. Koriander eller Guacamole"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-semibold text-gray-500 uppercase mb-1">
+                              Standard i retten
+                            </label>
+                            <input
+                              className="w-full p-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-1 focus:ring-forest"
+                              type="number"
+                              min={0}
+                              value={option.defaultQty}
+                              onChange={(e) => updateOption(index, { defaultQty: Number(e.target.value) || 0 })}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-semibold text-gray-500 uppercase mb-1">
+                              Pris per ekstra (kr)
+                            </label>
+                            <input
+                              className="w-full p-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-1 focus:ring-forest"
+                              type="number"
+                              min={0}
+                              value={option.price ?? 0}
+                              onChange={(e) => updateOption(index, { price: Number(e.target.value) || 0 })}
+                            />
+                          </div>
+                        </div>
+                        <div className="mt-2 text-[11px] text-gray-500 leading-snug">
+                          💡 <strong>Standard antall</strong> (f.eks. 1) koster <strong>0 kr ekstra</strong> for kunden.
+                          Kunden kan velge å fjerne ingrediensen (0 kr) eller legge til ekstra utover standard (som belastes pris per ekstra).
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                )
+              })}
               {editingOptions.length === 0 && (
-                <div className="text-xs text-gray-500 italic py-2">Ingen tilpasningsvalg enda. Trykk "+ Legg til valg".</div>
+                <div className="text-xs text-gray-500 italic py-2">Ingen tilpasningsvalg enda. Trykk knappene over for å legge til Styrkegrad eller Ingredienser.</div>
               )}
             </div>
           </div>
@@ -510,7 +615,6 @@ const MenuAdmin: React.FC = () => {
                     </div>
                     {it.description && <div className="text-xs text-gray-600 line-clamp-1">{it.description}</div>}
                     <div className="flex flex-wrap gap-2 items-center text-xs pt-1">
-                      {/* Quick 1-click availability toggle */}
                       <button
                         type="button"
                         onClick={() => toggleAvailability(it.id, it.available)}
@@ -532,18 +636,25 @@ const MenuAdmin: React.FC = () => {
                     </div>
                     {opts.length > 0 && (
                       <div className="flex flex-wrap gap-1.5 text-xs pt-1">
-                        {opts.map((option) => (
-                          <span
-                            key={option.id}
-                            className={`rounded-lg px-2 py-0.5 border text-[11px] ${
-                              option.available !== false
-                                ? 'bg-gray-50 border-gray-200 text-gray-700'
-                                : 'bg-gray-100 border-gray-200 text-gray-400 line-through'
-                            }`}
-                          >
-                            {option.label} {option.price ? `(+${option.price} kr)` : ''} {option.defaultQty > 0 ? `(std: ${option.defaultQty})` : ''}
-                          </span>
-                        ))}
+                        {opts.map((option) => {
+                          const isSelect = option.type === 'select'
+                          return (
+                            <span
+                              key={option.id}
+                              className={`rounded-lg px-2 py-0.5 border text-[11px] ${
+                                option.available !== false
+                                  ? 'bg-gray-50 border-gray-200 text-gray-700'
+                                  : 'bg-gray-100 border-gray-200 text-gray-400 line-through'
+                              }`}
+                            >
+                              {isSelect ? (
+                                <>🎯 {option.label}: {(option.choices || []).join('/')}</>
+                              ) : (
+                                <>{option.label} {option.defaultQty > 0 ? `(Inkludert)` : ''} {option.price ? `(+${option.price} kr e.f.)` : ''}</>
+                              )}
+                            </span>
+                          )
+                        })}
                       </div>
                     )}
                   </div>

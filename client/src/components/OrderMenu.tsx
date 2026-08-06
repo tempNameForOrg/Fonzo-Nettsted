@@ -3,6 +3,10 @@ import React, { useEffect, useMemo, useState } from 'react'
 export type CustomizationOption = {
   id: string
   label: string
+  type?: 'quantity' | 'select'
+  choices?: string[]
+  choicesInput?: string
+  defaultChoice?: string
   price?: number
   defaultQty: number
   available: boolean
@@ -22,6 +26,7 @@ export type MenuItem = {
 
 export type Customization = {
   optionQuantities: Record<string, number>
+  optionSelections?: Record<string, string>
   optionLabels?: Record<string, string>
   details?: string[]
 }
@@ -57,6 +62,7 @@ const normalizeOptions = (value?: MenuItem['customization_options']): Customizat
         return {
           id: label.toLowerCase().replace(/[^a-z0-9]+/g, '-') || `opt-${index}`,
           label,
+          type: 'quantity' as const,
           price: 0,
           defaultQty: 0,
           available: true,
@@ -72,9 +78,19 @@ const normalizeOptions = (value?: MenuItem['customization_options']): Customizat
 
       if (!label || label === '[object Object]') return null
 
+      const type = option.type === 'select' ? ('select' as const) : ('quantity' as const)
+      const rawChoices = Array.isArray(option.choices)
+        ? option.choices
+        : String(option.choicesInput || option.choices || '').split(',').map((s: string) => s.trim()).filter(Boolean)
+      const choices = rawChoices.map((c: any) => String(c).trim()).filter(Boolean)
+      const defaultChoice = option.defaultChoice ? String(option.defaultChoice).trim() : (choices[0] || '')
+
       return {
         id: String(option.id || (label ? label.toLowerCase().replace(/[^a-z0-9]+/g, '-') : `opt-${index}`)),
         label,
+        type,
+        choices: type === 'select' ? choices : undefined,
+        defaultChoice: type === 'select' ? defaultChoice : undefined,
         price: Math.max(0, Number(option.price) || 0),
         defaultQty: Math.max(0, Number(option.defaultQty ?? 0) || 0),
         available: option.available !== false,
@@ -83,46 +99,74 @@ const normalizeOptions = (value?: MenuItem['customization_options']): Customizat
     .filter(Boolean) as CustomizationOption[]
 }
 
-const buildCustomization = (quantities: Record<string, number>, options: CustomizationOption[] = []): Customization => {
+const buildCustomization = (
+  quantities: Record<string, number>,
+  selections: Record<string, string>,
+  options: CustomizationOption[] = []
+): Customization => {
   const optionQuantities: Record<string, number> = {}
+  const optionSelections: Record<string, string> = {}
   const optionLabels: Record<string, string> = {}
   const details: string[] = []
 
   for (const opt of options) {
     optionLabels[opt.id] = opt.label
-    const qty = quantities[opt.id] || 0
-    optionQuantities[opt.id] = qty
-    if (qty > 0) {
-      const priceText = opt.price ? ` (+${opt.price * qty} kr)` : ''
-      details.push(`${opt.label} x${qty}${priceText}`)
+
+    if (opt.type === 'select') {
+      const selected = selections[opt.id] || opt.defaultChoice || opt.choices?.[0] || ''
+      if (selected) {
+        optionSelections[opt.id] = selected
+        details.push(`${opt.label}: ${selected}`)
+      }
+    } else {
+      const qty = quantities[opt.id] !== undefined ? quantities[opt.id] : Math.max(0, Number(opt.defaultQty) || 0)
+      optionQuantities[opt.id] = qty
+
+      const defaultQty = Math.max(0, Number(opt.defaultQty) || 0)
+      const price = Math.max(0, Number(opt.price) || 0)
+
+      if (defaultQty > 0 && qty === 0) {
+        // Explicitly removed ingredient
+        details.push(`Uten ${opt.label}`)
+      } else if (qty > defaultQty) {
+        // Extra units added beyond standard quantity
+        const extraQty = qty - defaultQty
+        const cost = extraQty * price
+        const priceText = cost > 0 ? ` (+${cost} kr)` : ''
+        details.push(`Ekstra ${opt.label} x${extraQty}${priceText}`)
+      } else if (defaultQty === 0 && qty > 0) {
+        // Optional add-on added
+        const cost = qty * price
+        const priceText = cost > 0 ? ` (+${cost} kr)` : ''
+        details.push(`${opt.label} x${qty}${priceText}`)
+      }
     }
   }
 
-  return { optionQuantities, optionLabels, details }
-}
-
-const createCustomization = (options: CustomizationOption[] = []): Customization => {
-  const initialQty: Record<string, number> = {}
-  for (const option of options) {
-    if (option.available !== false) {
-      initialQty[option.id] = Math.max(0, Number(option.defaultQty) || 0)
-    }
-  }
-  return buildCustomization(initialQty, options)
+  return { optionQuantities, optionSelections, optionLabels, details }
 }
 
 const calculateUnitPrice = (basePrice: number, customization: Customization, options: CustomizationOption[] = []) => {
   let extra = 0
   for (const opt of options) {
-    const qty = customization.optionQuantities[opt.id] || 0
-    if (qty > 0 && opt.price) {
-      extra += qty * opt.price
+    if (opt.type !== 'select') {
+      const qty = customization.optionQuantities[opt.id] !== undefined
+        ? customization.optionQuantities[opt.id]
+        : Math.max(0, Number(opt.defaultQty) || 0)
+      const defaultQty = Math.max(0, Number(opt.defaultQty) || 0)
+      const price = Math.max(0, Number(opt.price) || 0)
+
+      // Only charge extra for units exceeding defaultQty
+      if (qty > defaultQty && price > 0) {
+        extra += (qty - defaultQty) * price
+      }
     }
   }
   return basePrice + extra
 }
 
-const customizationKey = (customization: Customization) => JSON.stringify(customization.optionQuantities)
+const customizationKey = (customization: Customization) =>
+  JSON.stringify({ q: customization.optionQuantities, s: customization.optionSelections })
 
 const splitValues = (value?: string | null) =>
   String(value || '')
@@ -137,7 +181,8 @@ export default function OrderMenu() {
   const [activeTab, setActiveTab] = useState<string>('All')
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null)
   const [selectedOptions, setSelectedOptions] = useState<CustomizationOption[]>([])
-  const [draftCustomization, setDraftCustomization] = useState<Customization>({ optionQuantities: {} })
+  const [draftQuantities, setDraftQuantities] = useState<Record<string, number>>({})
+  const [draftSelections, setDraftSelections] = useState<Record<string, string>>({})
   const [draftQty, setDraftQty] = useState(1)
 
   useEffect(() => {
@@ -160,7 +205,6 @@ export default function OrderMenu() {
       setLoading(true)
       const res = await fetch('/api/menu')
       const data = await res.json()
-      // Only show items that are available for customers
       setMenu(data.filter((item: MenuItem) => item.available))
     } catch (error) {
       console.error('Failed to fetch menu', error)
@@ -173,20 +217,48 @@ export default function OrderMenu() {
     const options = normalizeOptions(item.customization_options)
     setSelectedItem(item)
     setSelectedOptions(options)
-    setDraftCustomization(createCustomization(options))
+
+    const initialQty: Record<string, number> = {}
+    const initialSel: Record<string, string> = {}
+    for (const opt of options) {
+      if (opt.type === 'select') {
+        initialSel[opt.id] = opt.defaultChoice || opt.choices?.[0] || ''
+      } else {
+        initialQty[opt.id] = Math.max(0, Number(opt.defaultQty) || 0)
+      }
+    }
+
+    setDraftQuantities(initialQty)
+    setDraftSelections(initialSel)
     setDraftQty(1)
   }
 
+  const setChoiceSelection = (optionId: string, choiceValue: string) => {
+    setDraftSelections((prev) => ({
+      ...prev,
+      [optionId]: choiceValue,
+    }))
+  }
+
   const bumpOptionQty = (optionId: string, delta: number) => {
-    setDraftCustomization((current) => {
-      const currentQty = current.optionQuantities[optionId] || 0
-      const nextQuantities = {
-        ...current.optionQuantities,
+    setDraftQuantities((prev) => {
+      const currentQty = prev[optionId] !== undefined ? prev[optionId] : 0
+      return {
+        ...prev,
         [optionId]: Math.max(0, currentQty + delta),
       }
-      return buildCustomization(nextQuantities, selectedOptions)
     })
   }
+
+  const draftCustomization = useMemo(
+    () => buildCustomization(draftQuantities, draftSelections, selectedOptions),
+    [draftQuantities, draftSelections, selectedOptions]
+  )
+
+  const currentDraftUnitPrice = useMemo(
+    () => (selectedItem ? calculateUnitPrice(selectedItem.price, draftCustomization, selectedOptions) : 0),
+    [selectedItem, draftCustomization, selectedOptions]
+  )
 
   const addToCart = (item: MenuItem, qty: number, customization: Customization) => {
     const normalizedQty = Math.max(1, qty)
@@ -270,17 +342,13 @@ export default function OrderMenu() {
     }
   }
 
-  const currentDraftUnitPrice = selectedItem
-    ? calculateUnitPrice(selectedItem.price, draftCustomization, selectedOptions)
-    : 0
-
   return (
     <div className="mx-auto max-w-6xl pb-40 lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-6">
       <div className="min-w-0">
         <div className="mb-4 flex items-end justify-between gap-3">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">Meny & Bestilling</h2>
-            <p className="text-sm text-gray-600">Velg en rett for å tilpasse tilbehør og antall.</p>
+            <p className="text-sm text-gray-600">Velg en rett for å tilpasse styrkegrad, ingredienser og antall.</p>
           </div>
         </div>
 
@@ -341,7 +409,7 @@ export default function OrderMenu() {
                         ))}
                         {opts.length > 0 && (
                           <span className="rounded-full bg-forest/10 px-2.5 py-1 text-forest font-semibold">
-                            {opts.length} tilpasninger tilgjengelig
+                            {opts.length} tilpasninger
                           </span>
                         )}
                       </div>
@@ -357,7 +425,7 @@ export default function OrderMenu() {
           })}
           {filteredMenu.length === 0 && !loading && (
             <div className="py-12 text-center text-gray-500 bg-white rounded-2xl border border-gray-200">
-              Ingen tilgjengelige retter i denne kategorien akkura nå.
+              Ingen tilgjengelige retter i denne kategorien akkurat nå.
             </div>
           )}
         </ul>
@@ -473,49 +541,104 @@ export default function OrderMenu() {
                   </div>
 
                   {selectedOptions.length > 0 ? (
-                    <div>
-                      <div className="mb-2 text-xs font-bold uppercase tracking-wider text-gray-500">Velg tilbehør & antall</div>
-                      <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-                        {selectedOptions.map((option) => {
-                          const qty = draftCustomization.optionQuantities[option.id] || 0
-                          const isAvailable = option.available !== false
-                          return (
-                            <div
-                              key={option.id}
-                              className={`flex items-center justify-between gap-3 rounded-2xl border p-3 ${
-                                isAvailable ? 'border-gray-200 bg-white' : 'border-gray-200 bg-gray-50 opacity-60'
-                              }`}
-                            >
-                              <div className="min-w-0">
-                                <div className="font-semibold text-sm text-gray-900">
-                                  {option.label}
-                                  {option.price ? <span className="ml-1 text-xs text-forest font-bold">(+{option.price} kr)</span> : null}
-                                </div>
-                                <div className="text-xs text-gray-500">
-                                  {isAvailable ? (option.defaultQty > 0 ? `Standard: ${option.defaultQty}` : 'Velg antall') : 'Utsolgt'}
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <button
-                                  className="w-8 h-8 rounded-xl border border-gray-300 bg-white text-gray-800 font-bold hover:bg-gray-100 disabled:opacity-40 cursor-pointer"
-                                  disabled={!isAvailable || qty <= 0}
-                                  onClick={() => bumpOptionQty(option.id, -1)}
-                                >
-                                  -
-                                </button>
-                                <span className="w-8 text-center font-bold text-sm">{qty}</span>
-                                <button
-                                  className="w-8 h-8 rounded-xl border border-gray-300 bg-white text-gray-800 font-bold hover:bg-gray-100 disabled:opacity-40 cursor-pointer"
-                                  disabled={!isAvailable}
-                                  onClick={() => bumpOptionQty(option.id, 1)}
-                                >
-                                  +
-                                </button>
-                              </div>
+                    <div className="space-y-4">
+                      {/* SINGLE CHOICE GROUPS (Styrkegrad, Saus) */}
+                      {selectedOptions.filter((opt) => opt.type === 'select').map((option) => {
+                        const choices = option.choices || ['Mild', 'Medium', 'Sterk']
+                        const currentSel = draftSelections[option.id] || option.defaultChoice || choices[0]
+                        const isAvailable = option.available !== false
+
+                        return (
+                          <div key={option.id} className="space-y-2 border-b pb-3">
+                            <div className="text-xs font-bold uppercase tracking-wider text-gray-700">
+                              {option.label}
                             </div>
-                          )
-                        })}
-                      </div>
+                            <div className="flex flex-wrap gap-2">
+                              {choices.map((choice) => {
+                                const isSelected = currentSel === choice
+                                return (
+                                  <button
+                                    key={choice}
+                                    type="button"
+                                    disabled={!isAvailable}
+                                    onClick={() => setChoiceSelection(option.id, choice)}
+                                    className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
+                                      isSelected
+                                        ? 'bg-forest text-white shadow-sm ring-2 ring-forest/30'
+                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                    } ${!isAvailable ? 'opacity-40 cursor-not-allowed' : ''}`}
+                                  >
+                                    {choice}
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )
+                      })}
+
+                      {/* QUANTITY / INGREDIENT OPTIONS */}
+                      {selectedOptions.filter((opt) => opt.type !== 'select').length > 0 && (
+                        <div className="space-y-2">
+                          <div className="text-xs font-bold uppercase tracking-wider text-gray-700">
+                            Ingredienser & Tillegg
+                          </div>
+                          <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                            {selectedOptions.filter((opt) => opt.type !== 'select').map((option) => {
+                              const qty = draftQuantities[option.id] !== undefined
+                                ? draftQuantities[option.id]
+                                : Math.max(0, Number(option.defaultQty) || 0)
+                              const isAvailable = option.available !== false
+                              const defaultQty = Math.max(0, Number(option.defaultQty) || 0)
+                              const isIncluded = defaultQty > 0
+
+                              return (
+                                <div
+                                  key={option.id}
+                                  className={`flex items-center justify-between gap-3 rounded-2xl border p-3 ${
+                                    isAvailable ? 'border-gray-200 bg-white' : 'border-gray-200 bg-gray-50 opacity-60'
+                                  }`}
+                                >
+                                  <div className="min-w-0">
+                                    <div className="font-semibold text-sm text-gray-900">
+                                      {option.label}
+                                      {option.price ? (
+                                        <span className="ml-1 text-xs text-forest font-bold">
+                                          ({isIncluded ? `+${option.price} kr for ekstra` : `+${option.price} kr stk`})
+                                        </span>
+                                      ) : null}
+                                    </div>
+                                    <div className="text-xs text-gray-500">
+                                      {!isAvailable
+                                        ? 'Utsolgt'
+                                        : isIncluded
+                                          ? (qty === 0 ? '❌ Fjernet (Uten)' : `✓ Inkludert i retten (std: ${defaultQty})`)
+                                          : (qty === 0 ? 'Valgfritt tillegg' : `Valgt: ${qty}`)}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      className="w-8 h-8 rounded-xl border border-gray-300 bg-white text-gray-800 font-bold hover:bg-gray-100 disabled:opacity-40 cursor-pointer"
+                                      disabled={!isAvailable || qty <= 0}
+                                      onClick={() => bumpOptionQty(option.id, -1)}
+                                    >
+                                      -
+                                    </button>
+                                    <span className="w-8 text-center font-bold text-sm">{qty}</span>
+                                    <button
+                                      className="w-8 h-8 rounded-xl border border-gray-300 bg-white text-gray-800 font-bold hover:bg-gray-100 disabled:opacity-40 cursor-pointer"
+                                      disabled={!isAvailable}
+                                      onClick={() => bumpOptionQty(option.id, 1)}
+                                    >
+                                      +
+                                    </button>
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="rounded-2xl bg-amber-50 border border-amber-200 p-3 text-xs text-amber-900">

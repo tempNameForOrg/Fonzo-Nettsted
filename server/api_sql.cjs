@@ -150,9 +150,19 @@ function normalizeCustomizationOptions(value) {
 
       if (!label || label === '[object Object]') return null
 
+      const type = entry.type === 'select' ? 'select' : 'quantity'
+      const rawChoices = Array.isArray(entry.choices)
+        ? entry.choices
+        : String(entry.choices || '').split(',').map(s => s.trim()).filter(Boolean)
+      const choices = rawChoices.map(c => String(c).trim()).filter(Boolean)
+      const defaultChoice = entry.defaultChoice ? String(entry.defaultChoice).trim() : (choices[0] || '')
+
       return {
         id: String(entry.id || label.toLowerCase().replace(/[^a-z0-9]+/g, '-') || `opt-${index}`),
         label,
+        type,
+        choices: type === 'select' ? choices : undefined,
+        defaultChoice: type === 'select' ? defaultChoice : undefined,
         price: Math.max(0, Number(entry.price) || 0),
         defaultQty: Math.max(0, Number(entry.defaultQty ?? entry.qty ?? 0) || 0),
         available: entry.available !== false,
