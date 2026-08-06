@@ -1,6 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react'
 
-type MenuItem = {
+export type CustomizationOption = {
+  id: string
+  label: string
+  price?: number
+  defaultQty: number
+  available: boolean
+}
+
+export type MenuItem = {
   id: string
   name: string
   description?: string
@@ -9,31 +17,112 @@ type MenuItem = {
   category?: string
   image?: string
   allergens?: string | null
-  customization_options?: string[] | string | null
+  customization_options?: CustomizationOption[] | string | null
 }
 
-type Customization = {
+export type Customization = {
   optionQuantities: Record<string, number>
+  optionLabels?: Record<string, string>
+  details?: string[]
 }
 
-type CartItem = MenuItem & { qty: number; customization: Customization }
-
-const createCustomization = (): Customization => ({ optionQuantities: {} })
-
-const customizationKey = (customization: Customization) => JSON.stringify(customization)
-
-const normalizeOptions = (value?: string[] | string | null) => {
-  if (!value) return [] as string[]
-  if (Array.isArray(value)) return value.map((entry) => String(entry).trim()).filter(Boolean)
-  try {
-    const parsed = JSON.parse(value)
-    if (Array.isArray(parsed)) return parsed.map((entry) => String(entry).trim()).filter(Boolean)
-  } catch (error) {}
-  return String(value)
-    .split('\n')
-    .map((entry) => entry.trim())
-    .filter(Boolean)
+export type CartItem = MenuItem & {
+  qty: number
+  unitPrice: number
+  customization: Customization
 }
+
+const normalizeOptions = (value?: MenuItem['customization_options']): CustomizationOption[] => {
+  if (!value) return []
+
+  let source: any = value
+  if (typeof source === 'string') {
+    try {
+      source = JSON.parse(source)
+    } catch (e) {
+      source = source.split('\n').map((s: string) => s.trim()).filter(Boolean)
+    }
+  }
+  if (typeof source === 'string') {
+    try { source = JSON.parse(source) } catch (e) {}
+  }
+
+  if (!Array.isArray(source)) return []
+
+  return source
+    .map((option: any, index: number) => {
+      if (typeof option === 'string') {
+        const label = option.trim()
+        if (!label || label === '[object Object]') return null
+        return {
+          id: label.toLowerCase().replace(/[^a-z0-9]+/g, '-') || `opt-${index}`,
+          label,
+          price: 0,
+          defaultQty: 0,
+          available: true,
+        }
+      }
+
+      if (!option || typeof option !== 'object') return null
+
+      let label = ''
+      if (typeof option.label === 'string') label = option.label.trim()
+      else if (typeof option.name === 'string') label = option.name.trim()
+      else if (typeof option.option === 'string') label = option.option.trim()
+
+      if (!label || label === '[object Object]') return null
+
+      return {
+        id: String(option.id || (label ? label.toLowerCase().replace(/[^a-z0-9]+/g, '-') : `opt-${index}`)),
+        label,
+        price: Math.max(0, Number(option.price) || 0),
+        defaultQty: Math.max(0, Number(option.defaultQty ?? 0) || 0),
+        available: option.available !== false,
+      }
+    })
+    .filter(Boolean) as CustomizationOption[]
+}
+
+const buildCustomization = (quantities: Record<string, number>, options: CustomizationOption[] = []): Customization => {
+  const optionQuantities: Record<string, number> = {}
+  const optionLabels: Record<string, string> = {}
+  const details: string[] = []
+
+  for (const opt of options) {
+    optionLabels[opt.id] = opt.label
+    const qty = quantities[opt.id] || 0
+    optionQuantities[opt.id] = qty
+    if (qty > 0) {
+      const priceText = opt.price ? ` (+${opt.price * qty} kr)` : ''
+      details.push(`${opt.label} x${qty}${priceText}`)
+    }
+  }
+
+  return { optionQuantities, optionLabels, details }
+}
+
+const createCustomization = (options: CustomizationOption[] = []): Customization => {
+  const initialQty: Record<string, number> = {}
+  for (const option of options) {
+    if (option.available !== false) {
+      initialQty[option.id] = Math.max(0, Number(option.defaultQty) || 0)
+    }
+  }
+  return buildCustomization(initialQty, options)
+}
+
+const calculateUnitPrice = (basePrice: number, customization: Customization, options: CustomizationOption[] = []) => {
+  let extra = 0
+  for (const opt of options) {
+    const qty = customization.optionQuantities[opt.id] || 0
+    if (qty > 0 && opt.price) {
+      extra += qty * opt.price
+    }
+  }
+  return basePrice + extra
+}
+
+const customizationKey = (customization: Customization) => JSON.stringify(customization.optionQuantities)
 
 const splitValues = (value?: string | null) =>
   String(value || '')
@@ -41,18 +130,14 @@ const splitValues = (value?: string | null) =>
     .map((entry) => entry.trim())
     .filter(Boolean)
 
-const optionSummary = (customization: Customization) =>
-  Object.entries(customization.optionQuantities)
-    .filter(([, qty]) => qty > 0)
-    .map(([option, qty]) => `${option} x${qty}`)
-
 export default function OrderMenu() {
   const [menu, setMenu] = useState<MenuItem[]>([])
   const [cart, setCart] = useState<CartItem[]>([])
   const [loading, setLoading] = useState(false)
   const [activeTab, setActiveTab] = useState<string>('All')
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null)
-  const [draftCustomization, setDraftCustomization] = useState<Customization>(createCustomization())
+  const [selectedOptions, setSelectedOptions] = useState<CustomizationOption[]>([])
+  const [draftCustomization, setDraftCustomization] = useState<Customization>({ optionQuantities: {} })
   const [draftQty, setDraftQty] = useState(1)
 
   useEffect(() => {
@@ -75,6 +160,7 @@ export default function OrderMenu() {
       setLoading(true)
       const res = await fetch('/api/menu')
       const data = await res.json()
+      // Only show items that are available for customers
       setMenu(data.filter((item: MenuItem) => item.available))
     } catch (error) {
       console.error('Failed to fetch menu', error)
@@ -84,42 +170,27 @@ export default function OrderMenu() {
   }
 
   const openCustomizer = (item: MenuItem) => {
+    const options = normalizeOptions(item.customization_options)
     setSelectedItem(item)
-    setDraftCustomization(createCustomization())
+    setSelectedOptions(options)
+    setDraftCustomization(createCustomization(options))
     setDraftQty(1)
   }
 
-  const setOptionQty = (option: string, qty: number) => {
-    setDraftCustomization((current) => ({
-      optionQuantities: {
+  const bumpOptionQty = (optionId: string, delta: number) => {
+    setDraftCustomization((current) => {
+      const currentQty = current.optionQuantities[optionId] || 0
+      const nextQuantities = {
         ...current.optionQuantities,
-        [option]: Math.max(0, qty),
-      },
-    }))
-  }
-
-  const bumpOptionQty = (option: string, delta: number) => {
-    setDraftCustomization((current) => {
-      const currentQty = current.optionQuantities[option] || 0
-      return {
-        optionQuantities: {
-          ...current.optionQuantities,
-          [option]: Math.max(0, currentQty + delta),
-        },
+        [optionId]: Math.max(0, currentQty + delta),
       }
-    })
-  }
-
-  const clearOption = (option: string) => {
-    setDraftCustomization((current) => {
-      const next = { ...current.optionQuantities }
-      delete next[option]
-      return { optionQuantities: next }
+      return buildCustomization(nextQuantities, selectedOptions)
     })
   }
 
   const addToCart = (item: MenuItem, qty: number, customization: Customization) => {
     const normalizedQty = Math.max(1, qty)
+    const unitPrice = calculateUnitPrice(item.price, customization, selectedOptions)
     const signature = customizationKey(customization)
 
     setCart((current) => {
@@ -132,8 +203,10 @@ export default function OrderMenu() {
         )
       }
 
-      return [...current, { ...item, qty: normalizedQty, customization }]
+      return [...current, { ...item, qty: normalizedQty, unitPrice, customization }]
     })
+
+    setSelectedItem(null)
   }
 
   const changeQty = (id: string, qty: number, customizationSignature?: string) => {
@@ -150,13 +223,20 @@ export default function OrderMenu() {
 
   const placeOrder = async () => {
     if (cart.length === 0) {
-      alert('Cart is empty')
+      alert('Handlekurven er tom')
       return
     }
 
     const payload = {
-      items: cart.map(({ id, name, price, qty, image, customization }) => ({ id, name, price, qty, image, customization })),
-      total: cart.reduce((sum, item) => sum + item.price * item.qty, 0),
+      items: cart.map(({ id, name, unitPrice, qty, image, customization }) => ({
+        id,
+        name,
+        price: unitPrice,
+        qty,
+        image,
+        customization,
+      })),
+      total: cart.reduce((sum, item) => sum + item.unitPrice * item.qty, 0),
       status: 'placed',
     }
 
@@ -171,7 +251,7 @@ export default function OrderMenu() {
       const saved = await res.json()
       setCart([])
       setSelectedItem(null)
-      alert('Order placed — ID: ' + saved.id)
+      alert('Takk for din bestilling! Bestillings-ID: ' + saved.id)
     } catch (error) {
       console.error('Failed to save order to API, falling back to localStorage', error)
       try {
@@ -182,109 +262,160 @@ export default function OrderMenu() {
         localStorage.setItem('orders', JSON.stringify(arr))
         setCart([])
         setSelectedItem(null)
-        alert('Order placed locally — ID: ' + order.id)
+        alert('Bestilling lagret lokalt! Bestillings-ID: ' + order.id)
       } catch (error2) {
         console.error('Failed to save locally', error2)
-        alert('Failed to place order')
+        alert('Kunne ikke sende bestillingen. Prøv igjen.')
       }
     }
   }
 
-  const selectedOptions = normalizeOptions(selectedItem?.customization_options)
+  const currentDraftUnitPrice = selectedItem
+    ? calculateUnitPrice(selectedItem.price, draftCustomization, selectedOptions)
+    : 0
 
   return (
     <div className="mx-auto max-w-6xl pb-40 lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-6">
       <div className="min-w-0">
         <div className="mb-4 flex items-end justify-between gap-3">
           <div>
-            <h2 className="text-2xl font-semibold">Meny</h2>
-            <p className="text-sm text-gray-600">Trykk på en rett for å åpne overlay og velge mengde per alternativ.</p>
+            <h2 className="text-2xl font-bold text-gray-900">Meny & Bestilling</h2>
+            <p className="text-sm text-gray-600">Velg en rett for å tilpasse tilbehør og antall.</p>
           </div>
         </div>
 
-        {loading && <div className="mb-4 text-sm text-gray-600">Laster meny...</div>}
+        {/* Category Tabs */}
+        <div className="mb-6 flex gap-2 overflow-x-auto pb-2 border-b border-gray-200">
+          {availableTabs.map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-4 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition-colors cursor-pointer ${
+                activeTab === tab
+                  ? 'bg-forest text-white shadow-sm'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              {tab === 'All' ? 'Alle retter' : tab}
+            </button>
+          ))}
+        </div>
 
-        <ul className="space-y-3">
+        {loading && <div className="mb-4 text-sm text-gray-500 italic">Laster inn menyen...</div>}
+
+        <ul className="space-y-4">
           {filteredMenu.map((item) => {
             const allergens = splitValues(item.allergens)
+            const opts = normalizeOptions(item.customization_options)
             return (
-              <li key={item.id} className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-                <button className="block w-full text-left" onClick={() => openCustomizer(item)}>
-                  <div className="grid gap-3 p-3 sm:grid-cols-[120px_minmax(0,1fr)] sm:items-center">
-                    <div className="aspect-square overflow-hidden rounded-xl bg-gray-100">
-                      {item.image ? <img src={item.image} alt={item.name} className="h-full w-full object-cover" /> : null}
+              <li key={item.id} className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm hover:border-gray-300 transition-all">
+                <button className="block w-full text-left cursor-pointer p-4" onClick={() => openCustomizer(item)}>
+                  <div className="grid gap-4 sm:grid-cols-[120px_minmax(0,1fr)] sm:items-center">
+                    <div className="aspect-square overflow-hidden rounded-xl bg-gray-100 shrink-0">
+                      {item.image ? (
+                        <img src={item.image} alt={item.name} className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="h-full w-full flex items-center justify-center text-xs text-gray-400">Ikke bilde</div>
+                      )}
                     </div>
 
-                    <div className="min-w-0">
-                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                        <div className="min-w-0">
-                          <div className="text-lg font-semibold">{item.name}</div>
-                          <div className="text-sm text-gray-600">{item.description}</div>
+                    <div className="min-w-0 flex flex-col justify-between h-full">
+                      <div>
+                        <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="text-lg font-bold text-gray-900">{item.name}</div>
+                          <div className="text-lg font-bold text-forest">{item.price} kr</div>
                         </div>
-                        <div className="text-lg font-semibold text-forest">{item.price} kr</div>
+                        {item.description && <div className="mt-1 text-sm text-gray-600 leading-snug">{item.description}</div>}
                       </div>
 
                       <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                        {(item.category ? [item.category] : ['Uten kategori']).map((tag) => (
-                          <span key={tag} className="rounded-full bg-gray-100 px-2 py-1 text-gray-700">
-                            {tag}
+                        {item.category && (
+                          <span className="rounded-full bg-gray-100 px-2.5 py-1 text-gray-700 font-medium">
+                            {item.category}
                           </span>
-                        ))}
+                        )}
                         {allergens.map((tag) => (
-                          <span key={tag} className="rounded-full bg-amber-100 px-2 py-1 text-amber-900">
+                          <span key={tag} className="rounded-full bg-amber-50 border border-amber-200 px-2.5 py-1 text-amber-800 font-medium">
                             Allergi: {tag}
                           </span>
                         ))}
+                        {opts.length > 0 && (
+                          <span className="rounded-full bg-forest/10 px-2.5 py-1 text-forest font-semibold">
+                            {opts.length} tilpasninger tilgjengelig
+                          </span>
+                        )}
                       </div>
 
-                      <div className="mt-4 text-sm font-semibold text-forest">Trykk for å spesialisere</div>
+                      <div className="mt-3 text-xs font-bold text-forest uppercase tracking-wider">
+                        + Trykk for å tilpasse & legge til
+                      </div>
                     </div>
                   </div>
                 </button>
               </li>
             )
           })}
+          {filteredMenu.length === 0 && !loading && (
+            <div className="py-12 text-center text-gray-500 bg-white rounded-2xl border border-gray-200">
+              Ingen tilgjengelige retter i denne kategorien akkura nå.
+            </div>
+          )}
         </ul>
       </div>
 
-      <aside className="mt-6 space-y-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm lg:mt-0 lg:sticky lg:top-4 lg:h-fit">
-        <div>
-          <h3 className="text-lg font-semibold">Handlekurv</h3>
-          <div className="text-sm text-gray-600">Valg med mengde lagres per ordrelinje.</div>
+      {/* Cart sidebar */}
+      <aside className="mt-6 space-y-4 rounded-3xl border border-gray-200 bg-white p-5 shadow-sm lg:mt-0 lg:sticky lg:top-4 lg:h-fit">
+        <div className="border-b pb-3">
+          <h3 className="text-lg font-bold text-gray-900">Handlekurv</h3>
+          <p className="text-xs text-gray-500">Dine valgte retter og tilpasninger</p>
         </div>
 
-        {cart.length === 0 && <div className="text-sm text-gray-600">Ingen varer ennå</div>}
+        {cart.length === 0 && <div className="py-6 text-center text-sm text-gray-500">Handlekurven er tom</div>}
 
-        <ul className="space-y-3">
+        <ul className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
           {cart.map((item) => {
-            const details = optionSummary(item.customization)
+            const details = item.customization.details || []
             return (
-              <li key={`${item.id}-${customizationKey(item.customization)}`} className="rounded-xl border border-gray-200 p-3">
+              <li key={`${item.id}-${customizationKey(item.customization)}`} className="rounded-2xl border border-gray-100 p-3 bg-gray-50/50">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="font-semibold">{item.name}</div>
-                    <div className="text-sm text-gray-600">{item.price} kr stykket</div>
+                    <div className="font-bold text-gray-900">{item.name}</div>
+                    <div className="text-xs text-gray-500">{item.unitPrice} kr stk</div>
                   </div>
-                  <div className="text-right font-semibold">{(item.price * item.qty).toFixed(0)} kr</div>
+                  <div className="text-right font-bold text-gray-900">{(item.unitPrice * item.qty).toFixed(0)} kr</div>
                 </div>
 
                 {details.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                    {details.map((tag) => (
-                      <span key={tag} className="rounded-full bg-gray-100 px-2 py-1 text-gray-700">
+                  <div className="mt-2 flex flex-wrap gap-1.5 text-xs">
+                    {details.map((tag, idx) => (
+                      <span key={idx} className="rounded-md bg-white border border-gray-200 px-2 py-0.5 text-gray-700 text-[11px]">
                         {tag}
                       </span>
                     ))}
                   </div>
                 )}
 
-                <div className="mt-3 flex items-center gap-2">
-                  <button className="rounded-lg border border-gray-300 px-3 py-1" onClick={() => changeQty(item.id, item.qty - 1, customizationKey(item.customization))}>
-                    -
-                  </button>
-                  <span className="min-w-8 text-center font-medium">{item.qty}</span>
-                  <button className="rounded-lg border border-gray-300 px-3 py-1" onClick={() => changeQty(item.id, item.qty + 1, customizationKey(item.customization))}>
-                    +
+                <div className="mt-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <button
+                      className="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 font-bold hover:bg-gray-100 cursor-pointer"
+                      onClick={() => changeQty(item.id, item.qty - 1, customizationKey(item.customization))}
+                    >
+                      -
+                    </button>
+                    <span className="min-w-6 text-center font-bold text-sm">{item.qty}</span>
+                    <button
+                      className="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 font-bold hover:bg-gray-100 cursor-pointer"
+                      onClick={() => changeQty(item.id, item.qty + 1, customizationKey(item.customization))}
+                    >
+                      +
+                    </button>
+                  </div>
+                  <button
+                    className="text-xs font-semibold text-red-600 hover:text-red-800 cursor-pointer"
+                    onClick={() => changeQty(item.id, 0, customizationKey(item.customization))}
+                  >
+                    Fjern
                   </button>
                 </div>
               </li>
@@ -292,74 +423,94 @@ export default function OrderMenu() {
           })}
         </ul>
 
-        <div className="rounded-xl bg-forest/5 p-3">
-          <div className="flex items-center justify-between font-semibold">
-            <span>Total</span>
-            <span>{cart.reduce((sum, item) => sum + item.price * item.qty, 0)} kr</span>
+        {cart.length > 0 && (
+          <div className="pt-3 border-t border-gray-200 space-y-3">
+            <div className="flex items-center justify-between text-base font-bold text-gray-900">
+              <span>Totalsum</span>
+              <span className="text-forest text-xl">{cart.reduce((sum, item) => sum + item.unitPrice * item.qty, 0)} kr</span>
+            </div>
+            <button
+              className="w-full rounded-2xl bg-chili px-4 py-3.5 font-bold text-white shadow-md hover:bg-chili/90 transition-colors cursor-pointer"
+              onClick={placeOrder}
+            >
+              Send bestilling
+            </button>
           </div>
-          <button className="mt-3 w-full rounded-xl bg-chili px-4 py-3 font-semibold text-white" onClick={placeOrder}>
-            Send bestilling
-          </button>
-        </div>
+        )}
       </aside>
 
+      {/* Item Customizer Modal */}
       {selectedItem && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-3 sm:items-center">
-          <div className="w-full max-w-2xl overflow-hidden rounded-3xl bg-white shadow-2xl">
-            <div className="max-h-[90vh] overflow-y-auto p-4 sm:p-6">
-              <div className="mb-4 flex items-start justify-between gap-3">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-xs p-3 sm:items-center">
+          <div className="w-full max-w-2xl overflow-hidden rounded-3xl bg-white shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+            <div className="max-h-[90vh] overflow-y-auto p-5 sm:p-6 space-y-5">
+              <div className="flex items-start justify-between gap-3 border-b pb-3">
                 <div>
-                  <div className="text-sm uppercase tracking-[0.3em] text-gray-500">Spesialiser bestillingen</div>
-                  <h3 className="mt-1 text-2xl font-semibold">{selectedItem.name}</h3>
-                  <p className="text-sm text-gray-600">Velg hvor mye av hvert alternativ kunden skal ha.</p>
+                  <div className="text-xs font-bold uppercase tracking-wider text-forest">Tilpass din rett</div>
+                  <h3 className="mt-1 text-2xl font-bold text-gray-900">{selectedItem.name}</h3>
                 </div>
-                <button className="rounded-full border border-gray-300 px-3 py-2 text-sm font-semibold" onClick={() => setSelectedItem(null)}>
-                  Lukk
+                <button
+                  className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 font-bold cursor-pointer"
+                  onClick={() => setSelectedItem(null)}
+                >
+                  ✕
                 </button>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-[180px_minmax(0,1fr)]">
-                <div className="overflow-hidden rounded-2xl bg-gray-100">
-                  {selectedItem.image && <img src={selectedItem.image} alt={selectedItem.name} className="h-full w-full object-cover" />}
+              <div className="grid gap-5 sm:grid-cols-[160px_minmax(0,1fr)]">
+                <div className="overflow-hidden rounded-2xl bg-gray-100 aspect-square sm:aspect-auto sm:h-44">
+                  {selectedItem.image ? (
+                    <img src={selectedItem.image} alt={selectedItem.name} className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="h-full w-full flex items-center justify-center text-xs text-gray-400">Ikke bilde</div>
+                  )}
                 </div>
 
                 <div className="space-y-4">
                   <div>
-                    <div className="text-lg font-semibold text-forest">{selectedItem.price} kr</div>
-                    <div className="text-sm text-gray-600">{selectedItem.description}</div>
+                    <div className="text-xl font-bold text-forest">{selectedItem.price} kr <span className="text-xs text-gray-500 font-normal">(ordinær pris)</span></div>
+                    {selectedItem.description && <div className="mt-1 text-sm text-gray-600">{selectedItem.description}</div>}
                   </div>
 
                   {selectedOptions.length > 0 ? (
                     <div>
-                      <div className="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-500">Alternativer</div>
-                      <div className="space-y-2">
+                      <div className="mb-2 text-xs font-bold uppercase tracking-wider text-gray-500">Velg tilbehør & antall</div>
+                      <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
                         {selectedOptions.map((option) => {
-                          const qty = draftCustomization.optionQuantities[option] || 0
+                          const qty = draftCustomization.optionQuantities[option.id] || 0
+                          const isAvailable = option.available !== false
                           return (
-                            <div key={option} className="flex items-center justify-between gap-3 rounded-2xl border border-gray-200 px-3 py-2">
+                            <div
+                              key={option.id}
+                              className={`flex items-center justify-between gap-3 rounded-2xl border p-3 ${
+                                isAvailable ? 'border-gray-200 bg-white' : 'border-gray-200 bg-gray-50 opacity-60'
+                              }`}
+                            >
                               <div className="min-w-0">
-                                <div className="font-medium">{option}</div>
-                                <div className="text-xs text-gray-500">Bruk + og - for mengde.</div>
+                                <div className="font-semibold text-sm text-gray-900">
+                                  {option.label}
+                                  {option.price ? <span className="ml-1 text-xs text-forest font-bold">(+{option.price} kr)</span> : null}
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  {isAvailable ? (option.defaultQty > 0 ? `Standard: ${option.defaultQty}` : 'Velg antall') : 'Utsolgt'}
+                                </div>
                               </div>
                               <div className="flex items-center gap-2">
-                                <button className="rounded-lg border border-gray-300 px-3 py-2" onClick={() => bumpOptionQty(option, -1)}>
+                                <button
+                                  className="w-8 h-8 rounded-xl border border-gray-300 bg-white text-gray-800 font-bold hover:bg-gray-100 disabled:opacity-40 cursor-pointer"
+                                  disabled={!isAvailable || qty <= 0}
+                                  onClick={() => bumpOptionQty(option.id, -1)}
+                                >
                                   -
                                 </button>
-                                <input
-                                  className="w-14 rounded-lg border border-gray-300 p-2 text-center"
-                                  type="number"
-                                  min={0}
-                                  value={qty}
-                                  onChange={(e) => setOptionQty(option, Number(e.target.value) || 0)}
-                                />
-                                <button className="rounded-lg border border-gray-300 px-3 py-2" onClick={() => bumpOptionQty(option, 1)}>
+                                <span className="w-8 text-center font-bold text-sm">{qty}</span>
+                                <button
+                                  className="w-8 h-8 rounded-xl border border-gray-300 bg-white text-gray-800 font-bold hover:bg-gray-100 disabled:opacity-40 cursor-pointer"
+                                  disabled={!isAvailable}
+                                  onClick={() => bumpOptionQty(option.id, 1)}
+                                >
                                   +
                                 </button>
-                                {qty > 0 && (
-                                  <button className="rounded-lg border border-gray-300 px-3 py-2 text-xs" onClick={() => clearOption(option)}>
-                                    Nullstill
-                                  </button>
-                                )}
                               </div>
                             </div>
                           )
@@ -367,37 +518,45 @@ export default function OrderMenu() {
                       </div>
                     </div>
                   ) : (
-                    <div className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
-                      Denne retten har ingen forhåndsdefinerte alternativer enda. Legg dem inn i edit menu.
+                    <div className="rounded-2xl bg-amber-50 border border-amber-200 p-3 text-xs text-amber-900">
+                      Denne retten har ingen spesielle tilpasningsvalg registrert.
                     </div>
                   )}
 
-                  <label className="block text-sm font-medium">
-                    Antall retter
-                    <div className="mt-1 flex items-center gap-2">
-                      <button className="rounded-lg border border-gray-300 px-3 py-2" onClick={() => setDraftQty((current) => Math.max(1, current - 1))}>
+                  <div className="pt-2 border-t border-gray-100">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-1">Antall porsjoner</label>
+                    <div className="flex items-center gap-3">
+                      <button
+                        className="w-9 h-9 rounded-xl border border-gray-300 bg-white text-gray-800 font-bold hover:bg-gray-100 cursor-pointer"
+                        onClick={() => setDraftQty((current) => Math.max(1, current - 1))}
+                      >
                         -
                       </button>
-                      <input className="w-16 rounded-lg border border-gray-300 p-2 text-center" type="number" min={1} value={draftQty} onChange={(e) => setDraftQty(Math.max(1, Number(e.target.value) || 1))} />
-                      <button className="rounded-lg border border-gray-300 px-3 py-2" onClick={() => setDraftQty((current) => current + 1)}>
+                      <span className="w-10 text-center font-bold text-base">{draftQty}</span>
+                      <button
+                        className="w-9 h-9 rounded-xl border border-gray-300 bg-white text-gray-800 font-bold hover:bg-gray-100 cursor-pointer"
+                        onClick={() => setDraftQty((current) => current + 1)}
+                      >
                         +
                       </button>
+                      <div className="ml-auto text-right">
+                        <div className="text-xs text-gray-500">Pris per porsjon:</div>
+                        <div className="text-base font-bold text-forest">{currentDraftUnitPrice} kr</div>
+                      </div>
                     </div>
-                  </label>
-
-                  <div className="flex flex-wrap gap-2">
-                    {optionSummary(draftCustomization).map((tag) => (
-                      <span key={tag} className="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-700">
-                        {tag}
-                      </span>
-                    ))}
                   </div>
 
-                  <div className="flex gap-2">
-                    <button className="flex-1 rounded-xl bg-olive px-4 py-3 font-semibold text-black" onClick={() => addToCart(selectedItem, draftQty, draftCustomization)}>
-                      Legg til bestilling
+                  <div className="pt-3 flex gap-3">
+                    <button
+                      className="flex-1 rounded-2xl bg-forest py-3 px-4 font-bold text-white shadow-md hover:bg-forest/90 transition-colors cursor-pointer"
+                      onClick={() => addToCart(selectedItem, draftQty, draftCustomization)}
+                    >
+                      Legg i handlekurv ({(currentDraftUnitPrice * draftQty).toFixed(0)} kr)
                     </button>
-                    <button className="rounded-xl border border-gray-300 px-4 py-3 font-semibold" onClick={() => setSelectedItem(null)}>
+                    <button
+                      className="rounded-2xl border border-gray-300 px-4 py-3 font-semibold text-gray-700 hover:bg-gray-50 cursor-pointer"
+                      onClick={() => setSelectedItem(null)}
+                    >
                       Avbryt
                     </button>
                   </div>
@@ -407,33 +566,6 @@ export default function OrderMenu() {
           </div>
         </div>
       )}
-
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 backdrop-blur lg:hidden">
-        <div className="mx-auto max-w-6xl px-3 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)]">
-          <div className="mb-3 flex items-center justify-between gap-3 rounded-2xl bg-marigold px-4 py-3 shadow-sm">
-            <div className="text-sm font-semibold text-black">Cart ({cart.reduce((sum, item) => sum + item.qty, 0)})</div>
-            <button className="text-sm font-semibold text-black" onClick={placeOrder}>
-              {cart.length > 0 ? `${cart.reduce((sum, item) => sum + item.price * item.qty, 0)} kr` : 'Send bestilling'}
-            </button>
-          </div>
-
-          <div className="flex items-stretch justify-between gap-2 overflow-x-auto">
-            {availableTabs.map((tab) => {
-              const active = tab === activeTab
-              return (
-                <button
-                  key={tab}
-                  className={`min-w-[92px] flex-1 border-t-4 px-3 py-2 text-center ${active ? 'border-[#d8843c] bg-white text-black' : 'border-transparent bg-white text-gray-700'}`}
-                  onClick={() => setActiveTab(tab)}
-                >
-                  <div className="mx-auto mb-1 h-10 w-10 rounded-xl border border-gray-300 bg-white" />
-                  <div className="text-sm">{tab === 'All' ? 'Alle' : tab}</div>
-                </button>
-              )
-            })}
-          </div>
-        </div>
-      </div>
     </div>
   )
 }

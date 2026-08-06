@@ -70,6 +70,19 @@ try {
   console.warn('could not ensure schema columns', error)
 }
 
+try {
+  const rows = db.prepare('SELECT id, customization_options FROM menu_items').all()
+  const updateStmt = db.prepare('UPDATE menu_items SET customization_options = ? WHERE id = ?')
+  for (const row of rows) {
+    if (row.customization_options && String(row.customization_options).includes('[object Object]')) {
+      const cleaned = normalizeCustomizationOptions(row.customization_options)
+      updateStmt.run(JSON.stringify(cleaned), row.id)
+    }
+  }
+} catch (e) {
+  console.warn('DB cleanup warning', e)
+}
+
 function now() {
   return Date.now()
 }
@@ -94,6 +107,57 @@ function parseStringList(value) {
   return String(value)
     .split('\n')
     .map((entry) => entry.trim())
+    .filter(Boolean)
+}
+
+function normalizeCustomizationOptions(value) {
+  if (!value) return []
+
+  let source = value
+  if (typeof source === 'string') {
+    try {
+      source = JSON.parse(source)
+    } catch (e) {
+      source = source.split('\n').map((s) => s.trim()).filter(Boolean)
+    }
+  }
+  if (typeof source === 'string') {
+    try { source = JSON.parse(source) } catch (e) {}
+  }
+
+  if (!Array.isArray(source)) return []
+
+  return source
+    .map((entry, index) => {
+      if (typeof entry === 'string') {
+        const label = entry.trim()
+        if (!label || label === '[object Object]') return null
+        return {
+          id: label.toLowerCase().replace(/[^a-z0-9]+/g, '-') || `opt-${index}`,
+          label,
+          price: 0,
+          defaultQty: 0,
+          available: true,
+        }
+      }
+
+      if (!entry || typeof entry !== 'object') return null
+
+      let label = ''
+      if (typeof entry.label === 'string') label = entry.label.trim()
+      else if (typeof entry.name === 'string') label = entry.name.trim()
+      else if (typeof entry.option === 'string') label = entry.option.trim()
+
+      if (!label || label === '[object Object]') return null
+
+      return {
+        id: String(entry.id || label.toLowerCase().replace(/[^a-z0-9]+/g, '-') || `opt-${index}`),
+        label,
+        price: Math.max(0, Number(entry.price) || 0),
+        defaultQty: Math.max(0, Number(entry.defaultQty ?? entry.qty ?? 0) || 0),
+        available: entry.available !== false,
+      }
+    })
     .filter(Boolean)
 }
 
@@ -134,7 +198,7 @@ app.get('/api/menu', (req, res) => {
     rows.map((row) => ({
       ...row,
       available: !!row.available,
-      customization_options: parseStringList(row.customization_options),
+      customization_options: normalizeCustomizationOptions(row.customization_options),
     })),
   )
 })
@@ -236,7 +300,7 @@ app.post('/api/menu', (req, res) => {
   const id = String(Date.now())
   const createdAt = now()
   const updatedAt = createdAt
-  const options = parseStringList(customization_options)
+  const options = normalizeCustomizationOptions(customization_options)
 
   db.prepare('INSERT INTO menu_items (id,name,description,price,category,allergens,customization_options,available,position,image,createdAt,updatedAt) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)')
     .run(id, name, description, Number(price), category, allergens, JSON.stringify(options), available ? 1 : 0, Number(position), image, createdAt, updatedAt)
@@ -250,7 +314,7 @@ app.put('/api/menu/:id', (req, res) => {
   const id = req.params.id
   const { name, description, price, category, allergens, customization_options, available, position, image } = req.body
   const updatedAt = now()
-  const options = customization_options !== undefined ? JSON.stringify(parseStringList(customization_options)) : undefined
+  const options = customization_options !== undefined ? JSON.stringify(normalizeCustomizationOptions(customization_options)) : undefined
 
   db.prepare('UPDATE menu_items SET name = coalesce(?, name), description = coalesce(?, description), price = coalesce(?, price), category = coalesce(?, category), allergens = coalesce(?, allergens), customization_options = coalesce(?, customization_options), available = coalesce(?, available), position = coalesce(?, position), image = coalesce(?, image), updatedAt = ? WHERE id = ?')
     .run(name, description, price !== undefined ? Number(price) : undefined, category, allergens, options, available !== undefined ? (available ? 1 : 0) : undefined, position !== undefined ? Number(position) : undefined, image !== undefined ? image : undefined, updatedAt, id)
@@ -258,7 +322,7 @@ app.put('/api/menu/:id', (req, res) => {
   const item = db.prepare('SELECT * FROM menu_items WHERE id = ?').get(id)
   if (!item) return res.status(404).json({ error: 'not found' })
   item.available = !!item.available
-  item.customization_options = parseStringList(item.customization_options)
+  item.customization_options = normalizeCustomizationOptions(item.customization_options)
   broadcast({ type: 'menu-updated', item })
   res.json(item)
 })
