@@ -116,7 +116,10 @@ function App() {
 
         {view !== "admin" && view !== "order" && (
           <section id="Info">
+            <div className="h-[50vh]"></div>
             <Timeline />
+            <div className="h-screen"></div>
+
           </section>
         )}
 
