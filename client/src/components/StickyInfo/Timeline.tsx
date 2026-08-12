@@ -27,7 +27,8 @@ type Keyframe = [progress: number, value: number];
 function keyframeValue(progress: number, frames: readonly Keyframe[]): number {
   if (frames.length === 0) return 0;
   if (progress <= frames[0][0]) return frames[0][1];
-  if (progress >= frames[frames.length - 1][0]) return frames[frames.length - 1][1];
+  if (progress >= frames[frames.length - 1][0])
+    return frames[frames.length - 1][1];
 
   for (let i = 0; i < frames.length - 1; i++) {
     const [p0, v0] = frames[i];
@@ -151,7 +152,9 @@ export default function Timeline() {
     }
   });
 
-  const sectionHeight = isMobile ? SECTION_HEIGHT_VH_MOBILE : SECTION_HEIGHT_VH_DESKTOP;
+  const sectionHeight = isMobile
+    ? SECTION_HEIGHT_VH_MOBILE
+    : SECTION_HEIGHT_VH_DESKTOP;
 
   return (
     <div
@@ -161,29 +164,34 @@ export default function Timeline() {
       style={{ height: `${sectionHeight}vh` }}
     >
       <div className="sticky top-0 h-screen w-full overflow-hidden">
-        <div ref={canvasWrapRef} className="absolute inset-0 will-change-transform">
-          <BurritoCanvas />
-        </div>
+        <div className="relative mx-auto h-full w-full max-w-5xl">
+          <div
+            ref={canvasWrapRef}
+            className="absolute inset-0 will-change-transform"
+          >
+            <BurritoCanvas />
+          </div>
 
-        <h1
-          ref={titleRef}
-          className="pointer-events-none absolute inset-0 flex items-center justify-center text-6xl font-bold text-forest md:text-9xl"
-        >
-          Fonzo Taco
-        </h1>
+          <h1
+            ref={titleRef}
+            className="pointer-events-none absolute inset-0 flex items-center justify-center text-6xl font-bold text-forest md:text-9xl"
+          >
+            Fonzo Taco
+          </h1>
 
-        <div
-          ref={infoRef}
-          className="p-4 absolute left-8 top-1/2 max-w-md -translate-y-1/2 opacity-0 md:left-16"
-        >
-          <Aapningstider />
-        </div>
+          <div
+            ref={infoRef}
+            className="p-4 absolute left-8 top-1/2 max-w-md -translate-y-1/2 opacity-0 md:left-16"
+          >
+            <Aapningstider />
+          </div>
 
-        <div
-          ref={googleRef}
-          className="p-4 absolute right-8 top-1/2 max-w-md -translate-y-1/2 opacity-0 md:right-16"
-        >
-          <Googleapi />
+          <div
+            ref={googleRef}
+            className="p-4 absolute right-8 top-1/2 max-w-md -translate-y-1/2 opacity-0 md:right-16"
+          >
+            <Googleapi />
+          </div>
         </div>
       </div>
     </div>
