@@ -3,8 +3,13 @@ import React from "react";
 const Aapningstider = () => {
   return (
     <>
-      <div className="color-olive py-5 my-5">
-        <div className="flex flex-col items-center">
+      <div id="aapningstider">
+        <div className="color-olive flex flex-col items-center">
+          <div className="flex my-5 items-center justify-center pointer-events-none">
+            <h1 className="text-center text-center text-6xl font-bold text-forest">
+              Når åpner vi?
+            </h1>
+          </div>
           <div className="rounded-lg border border-black bg-cream p-6 shadow-lg">
             <div className="flex flex-col bg-cream text-center">
               <h2 className="text-black text-2xl font-bold">Åpningsstider</h2>

@@ -53,7 +53,11 @@ function TacoEnd() {
 function GroundBeef() {
   const rand = useMemo(() => seededRandom(42), []);
   const chunks = useMemo(() => {
-    const arr = [];
+    const arr: {
+      position: [number, number, number];
+      rotation: [number, number, number];
+      scale: number;
+    }[] = [];
     for (let i = 0; i < 26; i++) {
       const x = (rand() - 0.5) * 2.1 + rand() * 0.5;
       const y = rand() * 0.35 - 0.2;
@@ -86,7 +90,11 @@ function GroundBeef() {
 function Lettuce() {
   const rand = useMemo(() => seededRandom(7), []);
   const strands = useMemo(() => {
-    const arr = [];
+    const arr: {
+      position: [number, number, number];
+      rotation: [number, number, number];
+      scale: number;
+    }[] = [];
     for (let i = 0; i < 15; i++) {
       const x = (rand() - 0.5) * 1.3 + rand();
       const y = rand() * 0.5 - 0.3;
@@ -118,7 +126,11 @@ function Lettuce() {
 function Tomato() {
   const rand = useMemo(() => seededRandom(19), []);
   const cubes = useMemo(() => {
-    const arr = [];
+    const arr: {
+      position: [number, number, number];
+      rotation: [number, number, number];
+      scale: number;
+    }[] = [];
     for (let i = 0; i < 19; i++) {
       const x = (rand() - 0.5) * 2;
       const spread = 1 - Math.abs(x) / 1.3;
@@ -148,7 +160,11 @@ function Tomato() {
 function Cheese() {
   const rand = useMemo(() => seededRandom(31), []);
   const strips = useMemo(() => {
-    const arr = [];
+    const arr: {
+      position: [number, number, number];
+      rotation: [number, number, number];
+      length: number;
+    }[] = [];
     for (let i = 0; i < 30; i++) {
       const x = (rand() - 0.5) * 2.3;
       const spread = 1 - Math.abs(x) / 1.3;
@@ -178,7 +194,11 @@ function Cheese() {
 function SourCreamDrizzle() {
   const rand = useMemo(() => seededRandom(55), []);
   const dots = useMemo(() => {
-    const arr = [];
+    const arr: {
+      position: [number, number, number];
+      scale: number;
+    }[] = [];
+
     for (let i = 0; i < 10; i++) {
       const x = (rand() - 0.5) * 1.8;
       const spread = 1 - Math.abs(x) / 1.3;
@@ -223,8 +243,19 @@ function Taco() {
     </>
   );
 }
+export function BurritoCanvas({ className = "" }: { className?: string }) {
+  return (
+    <Canvas
+      className={`!absolute !inset-0 !h-full !w-full ${className}`}
+      camera={{ position: [2, 0, 0], fov: 90 }}
+    >
+      <ambientLight intensity={2} position={[2, 2, 2]} />
+      <Taco />
+    </Canvas>
+  );
+}
 
-export default function TacoHero() {
+export default function BurritoDev() {
   return (
     <>
       <div className="mx-auto min-h-screen max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -233,20 +264,15 @@ export default function TacoHero() {
             className="!inset-0 !absolute !h-full !w-full"
             camera={{ position: [1.5, 0, 0], fov: 90 }}
           >
-            {/* <axesHelper args={[20]} />
+            <axesHelper args={[20]} />
             <gridHelper args={[20, 20, "red", "blue"]} />
             <GizmoHelper alignment="bottom-right" margin={[50, 50]}>
               <GizmoViewport />
             </GizmoHelper>
-            <OrbitControls /> */}
+            <OrbitControls />
             <ambientLight intensity={2} position={[2, 2, 2]} />
             <Taco />
           </Canvas>
-          <div className="absolute z-50 flex min-h-screen items-center justify-center pointer-events-none">
-            <h1 className="text-center text-center text-9xl font-bold text-forest">
-              Fonzo Taco
-            </h1>
-          </div>
         </div>
       </div>
     </>
