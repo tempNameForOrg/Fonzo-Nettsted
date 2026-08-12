@@ -4,7 +4,7 @@ const Aapningstider = () => {
   return (
     <>
       <div id="aapningstider">
-        <div className="h-screen color-olive flex flex-col items-center">
+        <div className="color-olive flex flex-col items-center">
           <div className="flex my-5 items-center justify-center pointer-events-none">
             <h1 className="text-center text-center text-6xl font-bold text-forest">
               Når åpner vi?
