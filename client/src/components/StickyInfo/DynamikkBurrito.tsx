@@ -53,7 +53,11 @@ function TacoEnd() {
 function GroundBeef() {
   const rand = useMemo(() => seededRandom(42), []);
   const chunks = useMemo(() => {
-    const arr = [];
+    const arr: {
+      position: [number, number, number];
+      rotation: [number, number, number];
+      scale: number;
+    }[] = [];
     for (let i = 0; i < 26; i++) {
       const x = (rand() - 0.5) * 2.1 + rand() * 0.5;
       const y = rand() * 0.35 - 0.2;
@@ -159,7 +163,7 @@ function Cheese() {
     const arr: {
       position: [number, number, number];
       rotation: [number, number, number];
-      scale: number;
+      length: number;
     }[] = [];
     for (let i = 0; i < 30; i++) {
       const x = (rand() - 0.5) * 2.3;
@@ -192,7 +196,6 @@ function SourCreamDrizzle() {
   const dots = useMemo(() => {
     const arr: {
       position: [number, number, number];
-      rotation: [number, number, number];
       scale: number;
     }[] = [];
 
